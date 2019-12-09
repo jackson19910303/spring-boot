@@ -42,10 +42,10 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
  *
  * @author Jayaram Pradhan
  */
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 @ContextConfiguration(initializers = DataRedisTestIntegrationTests.Initializer.class)
 @DataRedisTest
-public class DataRedisTestIntegrationTests {
+class DataRedisTestIntegrationTests {
 
 	@Container
 	public static RedisContainer redis = new RedisContainer();
@@ -62,7 +62,7 @@ public class DataRedisTestIntegrationTests {
 	private static final Charset CHARSET = StandardCharsets.UTF_8;
 
 	@Test
-	public void testRepository() {
+	void testRepository() {
 		PersonHash personHash = new PersonHash();
 		personHash.setDescription("Look, new @DataRedisTest!");
 		assertThat(personHash.getId()).isNull();
@@ -74,18 +74,16 @@ public class DataRedisTestIntegrationTests {
 	}
 
 	@Test
-	public void didNotInjectExampleService() {
+	void didNotInjectExampleService() {
 		assertThatExceptionOfType(NoSuchBeanDefinitionException.class)
 				.isThrownBy(() -> this.applicationContext.getBean(ExampleService.class));
 	}
 
-	static class Initializer
-			implements ApplicationContextInitializer<ConfigurableApplicationContext> {
+	static class Initializer implements ApplicationContextInitializer<ConfigurableApplicationContext> {
 
 		@Override
-		public void initialize(
-				ConfigurableApplicationContext configurableApplicationContext) {
-			TestPropertyValues.of("spring.redis.port=" + redis.getMappedPort())
+		public void initialize(ConfigurableApplicationContext configurableApplicationContext) {
+			TestPropertyValues.of("spring.redis.port=" + redis.getFirstMappedPort())
 					.applyTo(configurableApplicationContext.getEnvironment());
 		}
 

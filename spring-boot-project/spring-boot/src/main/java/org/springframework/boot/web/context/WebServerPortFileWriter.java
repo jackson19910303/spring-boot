@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2018 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.boot.system.SystemProperties;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationListener;
+import org.springframework.core.log.LogMessage;
 import org.springframework.util.Assert;
 import org.springframework.util.FileCopyUtils;
 import org.springframework.util.StringUtils;
@@ -40,8 +41,7 @@ import org.springframework.util.StringUtils;
  * @author Andy Wilkinson
  * @since 2.0.0
  */
-public class WebServerPortFileWriter
-		implements ApplicationListener<WebServerInitializedEvent> {
+public class WebServerPortFileWriter implements ApplicationListener<WebServerInitializedEvent> {
 
 	private static final String DEFAULT_FILE_NAME = "application.port";
 
@@ -92,7 +92,7 @@ public class WebServerPortFileWriter
 			portFile.deleteOnExit();
 		}
 		catch (Exception ex) {
-			logger.warn(String.format("Cannot create port file %s", this.file));
+			logger.warn(LogMessage.format("Cannot create port file %s", this.file));
 		}
 	}
 
@@ -125,16 +125,14 @@ public class WebServerPortFileWriter
 
 	private String getServerNamespace(ApplicationContext applicationContext) {
 		if (applicationContext instanceof WebServerApplicationContext) {
-			return ((WebServerApplicationContext) applicationContext)
-					.getServerNamespace();
+			return ((WebServerApplicationContext) applicationContext).getServerNamespace();
 		}
 		return null;
 	}
 
 	private boolean isUpperCase(String name) {
 		for (int i = 0; i < name.length(); i++) {
-			if (Character.isLetter(name.charAt(i))
-					&& !Character.isUpperCase(name.charAt(i))) {
+			if (Character.isLetter(name.charAt(i)) && !Character.isUpperCase(name.charAt(i))) {
 				return false;
 			}
 		}

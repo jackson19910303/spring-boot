@@ -35,6 +35,7 @@ import org.springframework.util.ClassUtils;
 import org.springframework.util.ObjectUtils;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
+import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
@@ -42,9 +43,9 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  *
  * @author Phillip Webb
  * @author Madhura Bhave
+ * @since 2.2.1
  */
-class WebMvcTypeExcludeFilter
-		extends StandardAnnotationCustomizableTypeExcludeFilter<WebMvcTest> {
+public final class WebMvcTypeExcludeFilter extends StandardAnnotationCustomizableTypeExcludeFilter<WebMvcTest> {
 
 	private static final Class<?>[] NO_CONTROLLERS = {};
 
@@ -66,6 +67,7 @@ class WebMvcTypeExcludeFilter
 		includes.add(ErrorAttributes.class);
 		includes.add(Converter.class);
 		includes.add(GenericConverter.class);
+		includes.add(HandlerInterceptor.class);
 		for (String optionalInclude : OPTIONAL_INCLUDES) {
 			try {
 				includes.add(ClassUtils.forName(optionalInclude, null));
@@ -89,8 +91,7 @@ class WebMvcTypeExcludeFilter
 
 	WebMvcTypeExcludeFilter(Class<?> testClass) {
 		super(testClass);
-		this.controllers = getAnnotation().getValue("controllers", Class[].class)
-				.orElse(NO_CONTROLLERS);
+		this.controllers = getAnnotation().getValue("controllers", Class[].class).orElse(NO_CONTROLLERS);
 	}
 
 	@Override

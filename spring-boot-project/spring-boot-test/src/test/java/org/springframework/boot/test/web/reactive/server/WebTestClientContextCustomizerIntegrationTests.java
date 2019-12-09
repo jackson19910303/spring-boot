@@ -33,24 +33,31 @@ import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.test.web.reactive.server.WebTestClient.Builder;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 /**
  * Integration test for {@link WebTestClientContextCustomizer}.
  *
  * @author Phillip Webb
  */
-@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT,
-		properties = "spring.main.web-application-type=reactive")
+@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT, properties = "spring.main.web-application-type=reactive")
 @DirtiesContext
-public class WebTestClientContextCustomizerIntegrationTests {
+class WebTestClientContextCustomizerIntegrationTests {
 
 	@Autowired
 	private WebTestClient webTestClient;
 
+	@Autowired
+	private WebTestClientBuilderCustomizer clientBuilderCustomizer;
+
 	@Test
-	public void test() {
-		this.webTestClient.get().uri("/").exchange().expectBody(String.class)
-				.isEqualTo("hello");
+	void test() {
+		verify(this.clientBuilderCustomizer).customize(any(Builder.class));
+		this.webTestClient.get().uri("/").exchange().expectBody(String.class).isEqualTo("hello");
 	}
 
 	@Configuration(proxyBeanMethods = false)
@@ -58,8 +65,13 @@ public class WebTestClientContextCustomizerIntegrationTests {
 	static class TestConfig {
 
 		@Bean
-		public TomcatReactiveWebServerFactory webServerFactory() {
+		TomcatReactiveWebServerFactory webServerFactory() {
 			return new TomcatReactiveWebServerFactory(0);
+		}
+
+		@Bean
+		WebTestClientBuilderCustomizer clientBuilderCustomizer() {
+			return mock(WebTestClientBuilderCustomizer.class);
 		}
 
 	}

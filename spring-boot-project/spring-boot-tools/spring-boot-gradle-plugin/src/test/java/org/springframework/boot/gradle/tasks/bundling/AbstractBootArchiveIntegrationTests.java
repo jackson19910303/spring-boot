@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2018 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,11 +23,10 @@ import java.util.jar.JarFile;
 import org.gradle.testkit.runner.InvalidRunnerConfigurationException;
 import org.gradle.testkit.runner.TaskOutcome;
 import org.gradle.testkit.runner.UnexpectedBuildFailure;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.TestTemplate;
+import org.junit.jupiter.api.extension.ExtendWith;
 
-import org.springframework.boot.gradle.junit.GradleCompatibilitySuite;
+import org.springframework.boot.gradle.junit.GradleCompatibilityExtension;
 import org.springframework.boot.gradle.testkit.GradleBuild;
 import org.springframework.boot.loader.tools.FileUtils;
 
@@ -38,11 +37,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Andy Wilkinson
  */
-@RunWith(GradleCompatibilitySuite.class)
-public abstract class AbstractBootArchiveIntegrationTests {
+@ExtendWith(GradleCompatibilityExtension.class)
+abstract class AbstractBootArchiveIntegrationTests {
 
-	@Rule
-	public GradleBuild gradleBuild;
+	GradleBuild gradleBuild;
 
 	private final String taskName;
 
@@ -50,102 +48,91 @@ public abstract class AbstractBootArchiveIntegrationTests {
 		this.taskName = taskName;
 	}
 
-	@Test
-	public void basicBuild() throws InvalidRunnerConfigurationException,
-			UnexpectedBuildFailure, IOException {
-		assertThat(this.gradleBuild.build(this.taskName).task(":" + this.taskName)
-				.getOutcome()).isEqualTo(TaskOutcome.SUCCESS);
+	@TestTemplate
+	void basicBuild() throws InvalidRunnerConfigurationException, UnexpectedBuildFailure, IOException {
+		assertThat(this.gradleBuild.build(this.taskName).task(":" + this.taskName).getOutcome())
+				.isEqualTo(TaskOutcome.SUCCESS);
 	}
 
-	@Test
-	public void reproducibleArchive() throws InvalidRunnerConfigurationException,
-			UnexpectedBuildFailure, IOException, InterruptedException {
-		assertThat(this.gradleBuild.build(this.taskName).task(":" + this.taskName)
-				.getOutcome()).isEqualTo(TaskOutcome.SUCCESS);
-		File jar = new File(this.gradleBuild.getProjectDir(), "build/libs")
-				.listFiles()[0];
+	@TestTemplate
+	void reproducibleArchive()
+			throws InvalidRunnerConfigurationException, UnexpectedBuildFailure, IOException, InterruptedException {
+		assertThat(this.gradleBuild.build(this.taskName).task(":" + this.taskName).getOutcome())
+				.isEqualTo(TaskOutcome.SUCCESS);
+		File jar = new File(this.gradleBuild.getProjectDir(), "build/libs").listFiles()[0];
 		String firstHash = FileUtils.sha1Hash(jar);
 		Thread.sleep(1500);
-		assertThat(this.gradleBuild.build("clean", this.taskName)
-				.task(":" + this.taskName).getOutcome()).isEqualTo(TaskOutcome.SUCCESS);
+		assertThat(this.gradleBuild.build("clean", this.taskName).task(":" + this.taskName).getOutcome())
+				.isEqualTo(TaskOutcome.SUCCESS);
 		String secondHash = FileUtils.sha1Hash(jar);
 		assertThat(firstHash).isEqualTo(secondHash);
 	}
 
-	@Test
-	public void upToDateWhenBuiltTwice() throws InvalidRunnerConfigurationException,
-			UnexpectedBuildFailure, IOException {
-		assertThat(this.gradleBuild.build(this.taskName).task(":" + this.taskName)
+	@TestTemplate
+	void upToDateWhenBuiltTwice() throws InvalidRunnerConfigurationException, UnexpectedBuildFailure, IOException {
+		assertThat(this.gradleBuild.build(this.taskName).task(":" + this.taskName).getOutcome())
+				.isEqualTo(TaskOutcome.SUCCESS);
+		assertThat(this.gradleBuild.build(this.taskName).task(":" + this.taskName).getOutcome())
+				.isEqualTo(TaskOutcome.UP_TO_DATE);
+	}
+
+	@TestTemplate
+	void upToDateWhenBuiltTwiceWithLaunchScriptIncluded()
+			throws InvalidRunnerConfigurationException, UnexpectedBuildFailure, IOException {
+		assertThat(this.gradleBuild.build("-PincludeLaunchScript=true", this.taskName).task(":" + this.taskName)
 				.getOutcome()).isEqualTo(TaskOutcome.SUCCESS);
-		assertThat(this.gradleBuild.build(this.taskName).task(":" + this.taskName)
+		assertThat(this.gradleBuild.build("-PincludeLaunchScript=true", this.taskName).task(":" + this.taskName)
 				.getOutcome()).isEqualTo(TaskOutcome.UP_TO_DATE);
 	}
 
-	@Test
-	public void upToDateWhenBuiltTwiceWithLaunchScriptIncluded()
-			throws InvalidRunnerConfigurationException, UnexpectedBuildFailure,
-			IOException {
-		assertThat(this.gradleBuild.build("-PincludeLaunchScript=true", this.taskName)
-				.task(":" + this.taskName).getOutcome()).isEqualTo(TaskOutcome.SUCCESS);
-		assertThat(this.gradleBuild.build("-PincludeLaunchScript=true", this.taskName)
-				.task(":" + this.taskName).getOutcome())
-						.isEqualTo(TaskOutcome.UP_TO_DATE);
+	@TestTemplate
+	void notUpToDateWhenLaunchScriptWasNotIncludedAndThenIsIncluded() {
+		assertThat(this.gradleBuild.build(this.taskName).task(":" + this.taskName).getOutcome())
+				.isEqualTo(TaskOutcome.SUCCESS);
+		assertThat(this.gradleBuild.build("-PincludeLaunchScript=true", this.taskName).task(":" + this.taskName)
+				.getOutcome()).isEqualTo(TaskOutcome.SUCCESS);
 	}
 
-	@Test
-	public void notUpToDateWhenLaunchScriptWasNotIncludedAndThenIsIncluded() {
-		assertThat(this.gradleBuild.build(this.taskName).task(":" + this.taskName)
+	@TestTemplate
+	void notUpToDateWhenLaunchScriptWasIncludedAndThenIsNotIncluded() {
+		assertThat(this.gradleBuild.build(this.taskName).task(":" + this.taskName).getOutcome())
+				.isEqualTo(TaskOutcome.SUCCESS);
+		assertThat(this.gradleBuild.build("-PincludeLaunchScript=true", this.taskName).task(":" + this.taskName)
 				.getOutcome()).isEqualTo(TaskOutcome.SUCCESS);
-		assertThat(this.gradleBuild.build("-PincludeLaunchScript=true", this.taskName)
-				.task(":" + this.taskName).getOutcome()).isEqualTo(TaskOutcome.SUCCESS);
 	}
 
-	@Test
-	public void notUpToDateWhenLaunchScriptWasIncludedAndThenIsNotIncluded() {
-		assertThat(this.gradleBuild.build(this.taskName).task(":" + this.taskName)
-				.getOutcome()).isEqualTo(TaskOutcome.SUCCESS);
-		assertThat(this.gradleBuild.build("-PincludeLaunchScript=true", this.taskName)
+	@TestTemplate
+	void notUpToDateWhenLaunchScriptPropertyChanges() {
+		assertThat(this.gradleBuild.build("-PincludeLaunchScript=true", "-PlaunchScriptProperty=foo", this.taskName)
+				.task(":" + this.taskName).getOutcome()).isEqualTo(TaskOutcome.SUCCESS);
+		assertThat(this.gradleBuild.build("-PincludeLaunchScript=true", "-PlaunchScriptProperty=bar", this.taskName)
 				.task(":" + this.taskName).getOutcome()).isEqualTo(TaskOutcome.SUCCESS);
 	}
 
-	@Test
-	public void notUpToDateWhenLaunchScriptPropertyChanges() {
-		assertThat(this.gradleBuild.build("-PincludeLaunchScript=true",
-				"-PlaunchScriptProperty=foo", this.taskName).task(":" + this.taskName)
-				.getOutcome()).isEqualTo(TaskOutcome.SUCCESS);
-		assertThat(this.gradleBuild.build("-PincludeLaunchScript=true",
-				"-PlaunchScriptProperty=bar", this.taskName).task(":" + this.taskName)
-				.getOutcome()).isEqualTo(TaskOutcome.SUCCESS);
-	}
-
-	@Test
-	public void applicationPluginMainClassNameIsUsed() throws IOException {
-		assertThat(this.gradleBuild.build(this.taskName).task(":" + this.taskName)
-				.getOutcome()).isEqualTo(TaskOutcome.SUCCESS);
-		try (JarFile jarFile = new JarFile(
-				new File(this.gradleBuild.getProjectDir(), "build/libs")
-						.listFiles()[0])) {
+	@TestTemplate
+	void applicationPluginMainClassNameIsUsed() throws IOException {
+		assertThat(this.gradleBuild.build(this.taskName).task(":" + this.taskName).getOutcome())
+				.isEqualTo(TaskOutcome.SUCCESS);
+		try (JarFile jarFile = new JarFile(new File(this.gradleBuild.getProjectDir(), "build/libs").listFiles()[0])) {
 			assertThat(jarFile.getManifest().getMainAttributes().getValue("Start-Class"))
 					.isEqualTo("com.example.CustomMain");
 		}
 	}
 
-	@Test
-	public void springBootExtensionMainClassNameIsUsed() throws IOException {
-		assertThat(this.gradleBuild.build(this.taskName).task(":" + this.taskName)
-				.getOutcome()).isEqualTo(TaskOutcome.SUCCESS);
-		try (JarFile jarFile = new JarFile(
-				new File(this.gradleBuild.getProjectDir(), "build/libs")
-						.listFiles()[0])) {
+	@TestTemplate
+	void springBootExtensionMainClassNameIsUsed() throws IOException {
+		assertThat(this.gradleBuild.build(this.taskName).task(":" + this.taskName).getOutcome())
+				.isEqualTo(TaskOutcome.SUCCESS);
+		try (JarFile jarFile = new JarFile(new File(this.gradleBuild.getProjectDir(), "build/libs").listFiles()[0])) {
 			assertThat(jarFile.getManifest().getMainAttributes().getValue("Start-Class"))
 					.isEqualTo("com.example.CustomMain");
 		}
 	}
 
-	@Test
-	public void duplicatesAreHandledGracefully() throws IOException {
-		assertThat(this.gradleBuild.build(this.taskName).task(":" + this.taskName)
-				.getOutcome()).isEqualTo(TaskOutcome.SUCCESS);
+	@TestTemplate
+	void duplicatesAreHandledGracefully() throws IOException {
+		assertThat(this.gradleBuild.build(this.taskName).task(":" + this.taskName).getOutcome())
+				.isEqualTo(TaskOutcome.SUCCESS);
 	}
 
 }

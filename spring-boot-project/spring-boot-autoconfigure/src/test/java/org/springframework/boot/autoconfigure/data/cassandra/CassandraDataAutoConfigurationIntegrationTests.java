@@ -16,6 +16,8 @@
 
 package org.springframework.boot.autoconfigure.data.cassandra;
 
+import java.time.Duration;
+
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.Session;
 import org.junit.jupiter.api.AfterEach;
@@ -29,7 +31,6 @@ import org.springframework.boot.autoconfigure.AutoConfigurationPackages;
 import org.springframework.boot.autoconfigure.cassandra.CassandraAutoConfiguration;
 import org.springframework.boot.autoconfigure.data.cassandra.city.City;
 import org.springframework.boot.test.util.TestPropertyValues;
-import org.springframework.boot.testsupport.testcontainers.SkippableContainer;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.data.cassandra.config.CassandraSessionFactoryBean;
 import org.springframework.data.cassandra.config.SchemaAction;
@@ -42,68 +43,57 @@ import static org.assertj.core.api.Assertions.assertThat;
  * @author Mark Paluch
  * @author Stephane Nicoll
  */
-@Testcontainers
-public class CassandraDataAutoConfigurationIntegrationTests {
+@Testcontainers(disabledWithoutDocker = true)
+class CassandraDataAutoConfigurationIntegrationTests {
 
 	@Container
-	public static SkippableContainer<CassandraContainer<?>> cassandra = new SkippableContainer<>(
-			CassandraContainer::new);
+	static final CassandraContainer<?> cassandra = new CassandraContainer<>().withStartupAttempts(5)
+			.withStartupTimeout(Duration.ofMinutes(2));
 
 	private AnnotationConfigApplicationContext context;
 
 	@BeforeEach
-	public void setUp() {
+	void setUp() {
 		this.context = new AnnotationConfigApplicationContext();
 		TestPropertyValues
-				.of("spring.data.cassandra.port="
-						+ cassandra.getContainer().getFirstMappedPort(),
-						"spring.data.cassandra.read-timeout=24000",
-						"spring.data.cassandra.connect-timeout=10000")
+				.of("spring.data.cassandra.port=" + cassandra.getFirstMappedPort(),
+						"spring.data.cassandra.read-timeout=24000", "spring.data.cassandra.connect-timeout=10000")
 				.applyTo(this.context.getEnvironment());
 	}
 
 	@AfterEach
-	public void close() {
+	void close() {
 		if (this.context != null) {
 			this.context.close();
 		}
 	}
 
 	@Test
-	public void hasDefaultSchemaActionSet() {
+	void hasDefaultSchemaActionSet() {
 		String cityPackage = City.class.getPackage().getName();
 		AutoConfigurationPackages.register(this.context, cityPackage);
-		this.context.register(CassandraAutoConfiguration.class,
-				CassandraDataAutoConfiguration.class);
+		this.context.register(CassandraAutoConfiguration.class, CassandraDataAutoConfiguration.class);
 		this.context.refresh();
-
-		CassandraSessionFactoryBean bean = this.context
-				.getBean(CassandraSessionFactoryBean.class);
+		CassandraSessionFactoryBean bean = this.context.getBean(CassandraSessionFactoryBean.class);
 		assertThat(bean.getSchemaAction()).isEqualTo(SchemaAction.NONE);
 	}
 
 	@Test
-	public void hasRecreateSchemaActionSet() {
+	void hasRecreateSchemaActionSet() {
 		createTestKeyspaceIfNotExists();
 		String cityPackage = City.class.getPackage().getName();
 		AutoConfigurationPackages.register(this.context, cityPackage);
-		TestPropertyValues
-				.of("spring.data.cassandra.schemaAction=recreate_drop_unused",
-						"spring.data.cassandra.keyspaceName=boot_test")
-				.applyTo(this.context);
-		this.context.register(CassandraAutoConfiguration.class,
-				CassandraDataAutoConfiguration.class);
+		TestPropertyValues.of("spring.data.cassandra.schemaAction=recreate_drop_unused",
+				"spring.data.cassandra.keyspaceName=boot_test").applyTo(this.context);
+		this.context.register(CassandraAutoConfiguration.class, CassandraDataAutoConfiguration.class);
 		this.context.refresh();
-		CassandraSessionFactoryBean bean = this.context
-				.getBean(CassandraSessionFactoryBean.class);
+		CassandraSessionFactoryBean bean = this.context.getBean(CassandraSessionFactoryBean.class);
 		assertThat(bean.getSchemaAction()).isEqualTo(SchemaAction.RECREATE_DROP_UNUSED);
 	}
 
 	private void createTestKeyspaceIfNotExists() {
-		Cluster cluster = Cluster.builder().withoutJMXReporting()
-				.withPort(cassandra.getContainer().getFirstMappedPort())
-				.addContactPoint(cassandra.getContainer().getContainerIpAddress())
-				.build();
+		Cluster cluster = Cluster.builder().withoutJMXReporting().withPort(cassandra.getFirstMappedPort())
+				.addContactPoint(cassandra.getContainerIpAddress()).build();
 		try (Session session = cluster.connect()) {
 			session.execute("CREATE KEYSPACE IF NOT EXISTS boot_test"
 					+ "  WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 };");

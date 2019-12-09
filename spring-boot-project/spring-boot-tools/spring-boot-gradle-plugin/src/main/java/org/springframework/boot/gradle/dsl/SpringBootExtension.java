@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2018 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,13 +17,16 @@
 package org.springframework.boot.gradle.dsl;
 
 import java.io.File;
+import java.lang.reflect.Method;
 
 import org.gradle.api.Action;
 import org.gradle.api.Project;
 import org.gradle.api.plugins.BasePlugin;
 import org.gradle.api.plugins.JavaPlugin;
 import org.gradle.api.plugins.JavaPluginConvention;
+import org.gradle.api.provider.Property;
 import org.gradle.api.tasks.SourceSet;
+import org.gradle.api.tasks.bundling.AbstractArchiveTask;
 import org.gradle.jvm.tasks.Jar;
 
 import org.springframework.boot.gradle.tasks.buildinfo.BuildInfo;
@@ -89,13 +92,11 @@ public class SpringBootExtension {
 	 * @param configurer the task configurer
 	 */
 	public void buildInfo(Action<BuildInfo> configurer) {
-		BuildInfo bootBuildInfo = this.project.getTasks().create("bootBuildInfo",
-				BuildInfo.class);
+		BuildInfo bootBuildInfo = this.project.getTasks().create("bootBuildInfo", BuildInfo.class);
 		bootBuildInfo.setGroup(BasePlugin.BUILD_GROUP);
 		bootBuildInfo.setDescription("Generates a META-INF/build-info.properties file.");
 		this.project.getPlugins().withType(JavaPlugin.class, (plugin) -> {
-			this.project.getTasks().getByName(JavaPlugin.CLASSES_TASK_NAME)
-					.dependsOn(bootBuildInfo);
+			this.project.getTasks().getByName(JavaPlugin.CLASSES_TASK_NAME).dependsOn(bootBuildInfo);
 			this.project.afterEvaluate((evaluated) -> {
 				BuildInfoProperties properties = bootBuildInfo.getProperties();
 				if (properties.getArtifact() == null) {
@@ -103,8 +104,7 @@ public class SpringBootExtension {
 				}
 			});
 			bootBuildInfo.getConventionMapping().map("destinationDir",
-					() -> new File(determineMainSourceSetResourcesOutputDir(),
-							"META-INF"));
+					() -> new File(determineMainSourceSetResourcesOutputDir(), "META-INF"));
 		});
 		if (configurer != null) {
 			configurer.execute(bootBuildInfo);
@@ -112,14 +112,13 @@ public class SpringBootExtension {
 	}
 
 	private File determineMainSourceSetResourcesOutputDir() {
-		return this.project.getConvention().getPlugin(JavaPluginConvention.class)
-				.getSourceSets().getByName(SourceSet.MAIN_SOURCE_SET_NAME).getOutput()
-				.getResourcesDir();
+		return this.project.getConvention().getPlugin(JavaPluginConvention.class).getSourceSets()
+				.getByName(SourceSet.MAIN_SOURCE_SET_NAME).getOutput().getResourcesDir();
 	}
 
 	private String determineArtifactBaseName() {
 		Jar artifactTask = findArtifactTask();
-		return (artifactTask != null) ? artifactTask.getBaseName() : null;
+		return (artifactTask != null) ? getArchiveBaseName(artifactTask) : null;
 	}
 
 	private Jar findArtifactTask() {
@@ -128,6 +127,29 @@ public class SpringBootExtension {
 			return artifactTask;
 		}
 		return (Jar) this.project.getTasks().findByName("bootJar");
+	}
+
+	@SuppressWarnings("unchecked")
+	private static String getArchiveBaseName(AbstractArchiveTask task) {
+		try {
+			Method method = findMethod(task.getClass(), "getArchiveBaseName");
+			if (method != null) {
+				return ((Property<String>) method.invoke(task)).get();
+			}
+		}
+		catch (Exception ex) {
+			// Continue
+		}
+		return task.getBaseName();
+	}
+
+	private static Method findMethod(Class<?> type, String name) {
+		for (Method candidate : type.getMethods()) {
+			if (candidate.getName().equals(name)) {
+				return candidate;
+			}
+		}
+		return null;
 	}
 
 }

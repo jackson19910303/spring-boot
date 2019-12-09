@@ -16,10 +16,8 @@
 
 package org.springframework.boot.actuate.autoconfigure.endpoint.web;
 
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.List;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.ObjectProvider;
@@ -28,7 +26,6 @@ import org.springframework.boot.actuate.autoconfigure.endpoint.ExposeExcludeProp
 import org.springframework.boot.actuate.endpoint.EndpointFilter;
 import org.springframework.boot.actuate.endpoint.EndpointsSupplier;
 import org.springframework.boot.actuate.endpoint.annotation.Endpoint;
-import org.springframework.boot.actuate.endpoint.http.ActuatorMediaType;
 import org.springframework.boot.actuate.endpoint.invoke.OperationInvokerAdvisor;
 import org.springframework.boot.actuate.endpoint.invoke.ParameterValueMapper;
 import org.springframework.boot.actuate.endpoint.web.EndpointMediaTypes;
@@ -67,15 +64,11 @@ import org.springframework.context.annotation.Configuration;
 @EnableConfigurationProperties(WebEndpointProperties.class)
 public class WebEndpointAutoConfiguration {
 
-	private static final List<String> MEDIA_TYPES = Arrays
-			.asList(ActuatorMediaType.V2_JSON, "application/json");
-
 	private final ApplicationContext applicationContext;
 
 	private final WebEndpointProperties properties;
 
-	public WebEndpointAutoConfiguration(ApplicationContext applicationContext,
-			WebEndpointProperties properties) {
+	public WebEndpointAutoConfiguration(ApplicationContext applicationContext, WebEndpointProperties properties) {
 		this.applicationContext = applicationContext;
 		this.properties = properties;
 	}
@@ -88,19 +81,16 @@ public class WebEndpointAutoConfiguration {
 	@Bean
 	@ConditionalOnMissingBean
 	public EndpointMediaTypes endpointMediaTypes() {
-		return new EndpointMediaTypes(MEDIA_TYPES, MEDIA_TYPES);
+		return EndpointMediaTypes.DEFAULT;
 	}
 
 	@Bean
 	@ConditionalOnMissingBean(WebEndpointsSupplier.class)
-	public WebEndpointDiscoverer webEndpointDiscoverer(
-			ParameterValueMapper parameterValueMapper,
-			EndpointMediaTypes endpointMediaTypes,
-			ObjectProvider<PathMapper> endpointPathMappers,
+	public WebEndpointDiscoverer webEndpointDiscoverer(ParameterValueMapper parameterValueMapper,
+			EndpointMediaTypes endpointMediaTypes, ObjectProvider<PathMapper> endpointPathMappers,
 			ObjectProvider<OperationInvokerAdvisor> invokerAdvisors,
 			ObjectProvider<EndpointFilter<ExposableWebEndpoint>> filters) {
-		return new WebEndpointDiscoverer(this.applicationContext, parameterValueMapper,
-				endpointMediaTypes,
+		return new WebEndpointDiscoverer(this.applicationContext, parameterValueMapper, endpointMediaTypes,
 				endpointPathMappers.orderedStream().collect(Collectors.toList()),
 				invokerAdvisors.orderedStream().collect(Collectors.toList()),
 				filters.orderedStream().collect(Collectors.toList()));
@@ -108,8 +98,7 @@ public class WebEndpointAutoConfiguration {
 
 	@Bean
 	@ConditionalOnMissingBean(ControllerEndpointsSupplier.class)
-	public ControllerEndpointDiscoverer controllerEndpointDiscoverer(
-			ObjectProvider<PathMapper> endpointPathMappers,
+	public ControllerEndpointDiscoverer controllerEndpointDiscoverer(ObjectProvider<PathMapper> endpointPathMappers,
 			ObjectProvider<Collection<EndpointFilter<ExposableControllerEndpoint>>> filters) {
 		return new ControllerEndpointDiscoverer(this.applicationContext,
 				endpointPathMappers.orderedStream().collect(Collectors.toList()),
@@ -118,25 +107,21 @@ public class WebEndpointAutoConfiguration {
 
 	@Bean
 	@ConditionalOnMissingBean
-	public PathMappedEndpoints pathMappedEndpoints(
-			Collection<EndpointsSupplier<?>> endpointSuppliers,
-			WebEndpointProperties webEndpointProperties) {
-		return new PathMappedEndpoints(webEndpointProperties.getBasePath(),
-				endpointSuppliers);
+	public PathMappedEndpoints pathMappedEndpoints(Collection<EndpointsSupplier<?>> endpointSuppliers) {
+		return new PathMappedEndpoints(this.properties.getBasePath(), endpointSuppliers);
 	}
 
 	@Bean
 	public ExposeExcludePropertyEndpointFilter<ExposableWebEndpoint> webExposeExcludePropertyEndpointFilter() {
 		WebEndpointProperties.Exposure exposure = this.properties.getExposure();
-		return new ExposeExcludePropertyEndpointFilter<>(ExposableWebEndpoint.class,
-				exposure.getInclude(), exposure.getExclude(), "info", "health");
+		return new ExposeExcludePropertyEndpointFilter<>(ExposableWebEndpoint.class, exposure.getInclude(),
+				exposure.getExclude(), "info", "health");
 	}
 
 	@Bean
 	public ExposeExcludePropertyEndpointFilter<ExposableControllerEndpoint> controllerExposeExcludePropertyEndpointFilter() {
 		WebEndpointProperties.Exposure exposure = this.properties.getExposure();
-		return new ExposeExcludePropertyEndpointFilter<>(
-				ExposableControllerEndpoint.class, exposure.getInclude(),
+		return new ExposeExcludePropertyEndpointFilter<>(ExposableControllerEndpoint.class, exposure.getInclude(),
 				exposure.getExclude());
 	}
 
@@ -146,8 +131,7 @@ public class WebEndpointAutoConfiguration {
 
 		@Bean
 		@ConditionalOnMissingBean(ServletEndpointsSupplier.class)
-		public ServletEndpointDiscoverer servletEndpointDiscoverer(
-				ApplicationContext applicationContext,
+		ServletEndpointDiscoverer servletEndpointDiscoverer(ApplicationContext applicationContext,
 				ObjectProvider<PathMapper> endpointPathMappers,
 				ObjectProvider<EndpointFilter<ExposableServletEndpoint>> filters) {
 			return new ServletEndpointDiscoverer(applicationContext,

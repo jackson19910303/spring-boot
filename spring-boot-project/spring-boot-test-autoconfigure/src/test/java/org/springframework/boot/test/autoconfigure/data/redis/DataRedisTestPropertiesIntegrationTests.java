@@ -36,30 +36,27 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Artsiom Yudovin
  */
-@Testcontainers
-@ContextConfiguration(
-		initializers = DataRedisTestPropertiesIntegrationTests.Initializer.class)
+@Testcontainers(disabledWithoutDocker = true)
+@ContextConfiguration(initializers = DataRedisTestPropertiesIntegrationTests.Initializer.class)
 @DataRedisTest(properties = "spring.profiles.active=test")
-public class DataRedisTestPropertiesIntegrationTests {
+class DataRedisTestPropertiesIntegrationTests {
 
 	@Container
-	public static RedisContainer redis = new RedisContainer();
+	static final RedisContainer redis = new RedisContainer();
 
 	@Autowired
 	private Environment environment;
 
 	@Test
-	public void environmentWithNewProfile() {
+	void environmentWithNewProfile() {
 		assertThat(this.environment.getActiveProfiles()).containsExactly("test");
 	}
 
-	static class Initializer
-			implements ApplicationContextInitializer<ConfigurableApplicationContext> {
+	static class Initializer implements ApplicationContextInitializer<ConfigurableApplicationContext> {
 
 		@Override
-		public void initialize(
-				ConfigurableApplicationContext configurableApplicationContext) {
-			TestPropertyValues.of("spring.redis.port=" + redis.getMappedPort())
+		public void initialize(ConfigurableApplicationContext configurableApplicationContext) {
+			TestPropertyValues.of("spring.redis.port=" + redis.getFirstMappedPort())
 					.applyTo(configurableApplicationContext.getEnvironment());
 		}
 

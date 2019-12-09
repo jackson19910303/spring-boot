@@ -16,6 +16,8 @@
 
 package org.springframework.boot.autoconfigure.data.redis;
 
+import java.time.Duration;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,61 +43,58 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Eddú Meléndez
  */
-@Testcontainers
-public class RedisRepositoriesAutoConfigurationTests {
+@Testcontainers(disabledWithoutDocker = true)
+class RedisRepositoriesAutoConfigurationTests {
 
 	@Container
-	public static RedisContainer redis = new RedisContainer();
+	public static RedisContainer redis = new RedisContainer().withStartupAttempts(5)
+			.withStartupTimeout(Duration.ofMinutes(2));
 
 	private AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
 
 	@BeforeEach
-	public void setUp() {
-		TestPropertyValues.of("spring.redis.port=" + redis.getMappedPort())
-				.applyTo(this.context.getEnvironment());
+	void setUp() {
+		TestPropertyValues.of("spring.redis.port=" + redis.getFirstMappedPort()).applyTo(this.context.getEnvironment());
 	}
 
 	@AfterEach
-	public void close() {
+	void close() {
 		this.context.close();
 	}
 
 	@Test
-	public void testDefaultRepositoryConfiguration() {
+	void testDefaultRepositoryConfiguration() {
 		this.context.register(TestConfiguration.class, RedisAutoConfiguration.class,
-				RedisRepositoriesAutoConfiguration.class,
-				PropertyPlaceholderAutoConfiguration.class);
+				RedisRepositoriesAutoConfiguration.class, PropertyPlaceholderAutoConfiguration.class);
 		this.context.refresh();
 		assertThat(this.context.getBean(CityRepository.class)).isNotNull();
 	}
 
 	@Test
-	public void testNoRepositoryConfiguration() {
+	void testNoRepositoryConfiguration() {
 		this.context.register(EmptyConfiguration.class, RedisAutoConfiguration.class,
-				RedisRepositoriesAutoConfiguration.class,
-				PropertyPlaceholderAutoConfiguration.class);
+				RedisRepositoriesAutoConfiguration.class, PropertyPlaceholderAutoConfiguration.class);
 		this.context.refresh();
 		assertThat(this.context.getBean("redisTemplate")).isNotNull();
 	}
 
 	@Test
-	public void doesNotTriggerDefaultRepositoryDetectionIfCustomized() {
+	void doesNotTriggerDefaultRepositoryDetectionIfCustomized() {
 		this.context.register(CustomizedConfiguration.class, RedisAutoConfiguration.class,
-				RedisRepositoriesAutoConfiguration.class,
-				PropertyPlaceholderAutoConfiguration.class);
+				RedisRepositoriesAutoConfiguration.class, PropertyPlaceholderAutoConfiguration.class);
 		this.context.refresh();
 		assertThat(this.context.getBean(CityRedisRepository.class)).isNotNull();
 	}
 
 	@Configuration(proxyBeanMethods = false)
 	@TestAutoConfigurationPackage(City.class)
-	protected static class TestConfiguration {
+	static class TestConfiguration {
 
 	}
 
 	@Configuration(proxyBeanMethods = false)
 	@TestAutoConfigurationPackage(EmptyDataPackage.class)
-	protected static class EmptyConfiguration {
+	static class EmptyConfiguration {
 
 	}
 

@@ -27,8 +27,7 @@ import org.springframework.boot.configurationprocessor.test.TestConfigurationMet
  *
  * @author Stephane Nicoll
  */
-class MetadataGenerationEnvironmentFactory
-		implements Function<ProcessingEnvironment, MetadataGenerationEnvironment> {
+class MetadataGenerationEnvironmentFactory implements Function<ProcessingEnvironment, MetadataGenerationEnvironment> {
 
 	@Override
 	public MetadataGenerationEnvironment apply(ProcessingEnvironment environment) {
@@ -36,6 +35,7 @@ class MetadataGenerationEnvironmentFactory
 				TestConfigurationMetadataAnnotationProcessor.CONFIGURATION_PROPERTIES_ANNOTATION,
 				TestConfigurationMetadataAnnotationProcessor.NESTED_CONFIGURATION_PROPERTY_ANNOTATION,
 				TestConfigurationMetadataAnnotationProcessor.DEPRECATED_CONFIGURATION_PROPERTY_ANNOTATION,
+				TestConfigurationMetadataAnnotationProcessor.CONSTRUCTOR_BINDING_ANNOTATION,
 				TestConfigurationMetadataAnnotationProcessor.DEFAULT_VALUE_ANNOTATION,
 				TestConfigurationMetadataAnnotationProcessor.ENDPOINT_ANNOTATION,
 				TestConfigurationMetadataAnnotationProcessor.READ_OPERATION_ANNOTATION);

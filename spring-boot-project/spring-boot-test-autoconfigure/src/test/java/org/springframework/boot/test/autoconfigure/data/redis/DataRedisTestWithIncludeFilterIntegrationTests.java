@@ -36,14 +36,13 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Jayaram Pradhan
  */
-@Testcontainers
-@ContextConfiguration(
-		initializers = DataRedisTestWithIncludeFilterIntegrationTests.Initializer.class)
+@Testcontainers(disabledWithoutDocker = true)
+@ContextConfiguration(initializers = DataRedisTestWithIncludeFilterIntegrationTests.Initializer.class)
 @DataRedisTest(includeFilters = @Filter(Service.class))
-public class DataRedisTestWithIncludeFilterIntegrationTests {
+class DataRedisTestWithIncludeFilterIntegrationTests {
 
 	@Container
-	public static RedisContainer redis = new RedisContainer();
+	static final RedisContainer redis = new RedisContainer();
 
 	@Autowired
 	private ExampleRepository exampleRepository;
@@ -52,7 +51,7 @@ public class DataRedisTestWithIncludeFilterIntegrationTests {
 	private ExampleService service;
 
 	@Test
-	public void testService() {
+	void testService() {
 		PersonHash personHash = new PersonHash();
 		personHash.setDescription("Look, new @DataRedisTest!");
 		assertThat(personHash.getId()).isNull();
@@ -60,13 +59,11 @@ public class DataRedisTestWithIncludeFilterIntegrationTests {
 		assertThat(this.service.hasRecord(savedEntity)).isTrue();
 	}
 
-	static class Initializer
-			implements ApplicationContextInitializer<ConfigurableApplicationContext> {
+	static class Initializer implements ApplicationContextInitializer<ConfigurableApplicationContext> {
 
 		@Override
-		public void initialize(
-				ConfigurableApplicationContext configurableApplicationContext) {
-			TestPropertyValues.of("spring.redis.port=" + redis.getMappedPort())
+		public void initialize(ConfigurableApplicationContext configurableApplicationContext) {
+			TestPropertyValues.of("spring.redis.port=" + redis.getFirstMappedPort())
 					.applyTo(configurableApplicationContext.getEnvironment());
 		}
 

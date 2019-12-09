@@ -24,8 +24,8 @@ import org.springframework.boot.diagnostics.FailureAnalysis;
 import org.springframework.boot.diagnostics.FailureAnalyzer;
 import org.springframework.boot.diagnostics.LoggingFailureAnalysisReporter;
 import org.springframework.session.SessionRepository;
-import org.springframework.session.hazelcast.HazelcastSessionRepository;
-import org.springframework.session.jdbc.JdbcOperationsSessionRepository;
+import org.springframework.session.hazelcast.HazelcastIndexedSessionRepository;
+import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -34,24 +34,22 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Stephane Nicoll
  */
-public class NonUniqueSessionRepositoryFailureAnalyzerTests {
+class NonUniqueSessionRepositoryFailureAnalyzerTests {
 
 	private final FailureAnalyzer analyzer = new NonUniqueSessionRepositoryFailureAnalyzer();
 
 	@Test
-	public void failureAnalysisWithMultipleCandidates() {
-		FailureAnalysis analysis = analyzeFailure(createFailure(
-				JdbcOperationsSessionRepository.class, HazelcastSessionRepository.class));
+	void failureAnalysisWithMultipleCandidates() {
+		FailureAnalysis analysis = analyzeFailure(
+				createFailure(JdbcIndexedSessionRepository.class, HazelcastIndexedSessionRepository.class));
 		assertThat(analysis).isNotNull();
-		assertThat(analysis.getDescription()).contains(
-				JdbcOperationsSessionRepository.class.getName(),
-				HazelcastSessionRepository.class.getName());
+		assertThat(analysis.getDescription()).contains(JdbcIndexedSessionRepository.class.getName(),
+				HazelcastIndexedSessionRepository.class.getName());
 		assertThat(analysis.getAction()).contains("spring.session.store-type");
 	}
 
 	@SafeVarargs
-	private final Exception createFailure(
-			Class<? extends SessionRepository<?>>... candidates) {
+	private final Exception createFailure(Class<? extends SessionRepository<?>>... candidates) {
 		return new NonUniqueSessionRepositoryException(Arrays.asList(candidates));
 	}
 

@@ -33,8 +33,12 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.ReactiveTransactionManager;
+import org.springframework.transaction.TransactionManager;
 import org.springframework.transaction.annotation.AbstractTransactionManagementConfiguration;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
+import org.springframework.transaction.reactive.TransactionalOperator;
+import org.springframework.transaction.support.TransactionOperations;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -47,8 +51,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnClass(PlatformTransactionManager.class)
 @AutoConfigureAfter({ JtaAutoConfiguration.class, HibernateJpaAutoConfiguration.class,
-		DataSourceTransactionManagerAutoConfiguration.class,
-		Neo4jDataAutoConfiguration.class })
+		DataSourceTransactionManagerAutoConfiguration.class, Neo4jDataAutoConfiguration.class })
 @EnableConfigurationProperties(TransactionProperties.class)
 public class TransactionAutoConfiguration {
 
@@ -56,8 +59,14 @@ public class TransactionAutoConfiguration {
 	@ConditionalOnMissingBean
 	public TransactionManagerCustomizers platformTransactionManagerCustomizers(
 			ObjectProvider<PlatformTransactionManagerCustomizer<?>> customizers) {
-		return new TransactionManagerCustomizers(
-				customizers.orderedStream().collect(Collectors.toList()));
+		return new TransactionManagerCustomizers(customizers.orderedStream().collect(Collectors.toList()));
+	}
+
+	@Bean
+	@ConditionalOnMissingBean
+	@ConditionalOnSingleCandidate(ReactiveTransactionManager.class)
+	public TransactionalOperator transactionalOperator(ReactiveTransactionManager transactionManager) {
+		return TransactionalOperator.create(transactionManager);
 	}
 
 	@Configuration(proxyBeanMethods = false)
@@ -65,31 +74,30 @@ public class TransactionAutoConfiguration {
 	public static class TransactionTemplateConfiguration {
 
 		@Bean
-		@ConditionalOnMissingBean
-		public TransactionTemplate transactionTemplate(
-				PlatformTransactionManager transactionManager) {
+		@ConditionalOnMissingBean(TransactionOperations.class)
+		public TransactionTemplate transactionTemplate(PlatformTransactionManager transactionManager) {
 			return new TransactionTemplate(transactionManager);
 		}
 
 	}
 
 	@Configuration(proxyBeanMethods = false)
-	@ConditionalOnBean(PlatformTransactionManager.class)
+	@ConditionalOnBean(TransactionManager.class)
 	@ConditionalOnMissingBean(AbstractTransactionManagementConfiguration.class)
 	public static class EnableTransactionManagementConfiguration {
 
 		@Configuration(proxyBeanMethods = false)
 		@EnableTransactionManagement(proxyTargetClass = false)
-		@ConditionalOnProperty(prefix = "spring.aop", name = "proxy-target-class",
-				havingValue = "false", matchIfMissing = false)
+		@ConditionalOnProperty(prefix = "spring.aop", name = "proxy-target-class", havingValue = "false",
+				matchIfMissing = false)
 		public static class JdkDynamicAutoProxyConfiguration {
 
 		}
 
 		@Configuration(proxyBeanMethods = false)
 		@EnableTransactionManagement(proxyTargetClass = true)
-		@ConditionalOnProperty(prefix = "spring.aop", name = "proxy-target-class",
-				havingValue = "true", matchIfMissing = true)
+		@ConditionalOnProperty(prefix = "spring.aop", name = "proxy-target-class", havingValue = "true",
+				matchIfMissing = true)
 		public static class CglibAutoProxyConfiguration {
 
 		}

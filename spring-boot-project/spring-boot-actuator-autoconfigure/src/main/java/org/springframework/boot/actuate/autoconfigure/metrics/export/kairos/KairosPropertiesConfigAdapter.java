@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2018 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,12 +21,12 @@ import io.micrometer.kairos.KairosConfig;
 import org.springframework.boot.actuate.autoconfigure.metrics.export.properties.StepRegistryPropertiesConfigAdapter;
 
 /**
- * Adapter to convert {@link KairosProperties} to an {@link KairosConfig}.
+ * Adapter to convert {@link KairosProperties} to a {@link KairosConfig}.
  *
  * @author Stephane Nicoll
  */
-class KairosPropertiesConfigAdapter extends
-		StepRegistryPropertiesConfigAdapter<KairosProperties> implements KairosConfig {
+class KairosPropertiesConfigAdapter extends StepRegistryPropertiesConfigAdapter<KairosProperties>
+		implements KairosConfig {
 
 	KairosPropertiesConfigAdapter(KairosProperties properties) {
 		super(properties);

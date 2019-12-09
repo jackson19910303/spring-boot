@@ -18,8 +18,6 @@ package org.springframework.boot.actuate.autoconfigure.web.jersey;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.servlet.ServletContainer;
 
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.boot.autoconfigure.jersey.ResourceConfigCustomizer;
 import org.springframework.boot.autoconfigure.web.servlet.JerseyApplicationPath;
 import org.springframework.boot.web.servlet.ServletRegistrationBean;
 import org.springframework.context.annotation.Bean;
@@ -34,19 +32,15 @@ import org.springframework.context.annotation.Configuration;
 class JerseyManagementContextConfiguration {
 
 	@Bean
-	public ServletRegistrationBean<ServletContainer> jerseyServletRegistration(
-			JerseyApplicationPath jerseyApplicationPath, ResourceConfig resourceConfig) {
+	ServletRegistrationBean<ServletContainer> jerseyServletRegistration(JerseyApplicationPath jerseyApplicationPath,
+			ResourceConfig resourceConfig) {
 		return new ServletRegistrationBean<>(new ServletContainer(resourceConfig),
 				jerseyApplicationPath.getUrlMapping());
 	}
 
 	@Bean
-	public ResourceConfig resourceConfig(
-			ObjectProvider<ResourceConfigCustomizer> resourceConfigCustomizers) {
-		ResourceConfig resourceConfig = new ResourceConfig();
-		resourceConfigCustomizers.orderedStream()
-				.forEach((customizer) -> customizer.customize(resourceConfig));
-		return resourceConfig;
+	ResourceConfig resourceConfig() {
+		return new ResourceConfig();
 	}
 
 }

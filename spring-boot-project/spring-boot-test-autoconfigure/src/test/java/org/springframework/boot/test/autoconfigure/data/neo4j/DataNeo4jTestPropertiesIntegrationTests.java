@@ -23,7 +23,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.util.TestPropertyValues;
-import org.springframework.boot.testsupport.testcontainers.SkippableContainer;
 import org.springframework.context.ApplicationContextInitializer;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.env.Environment;
@@ -37,32 +36,27 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Artsiom Yudovin
  */
-@Testcontainers
-@ContextConfiguration(
-		initializers = DataNeo4jTestPropertiesIntegrationTests.Initializer.class)
+@Testcontainers(disabledWithoutDocker = true)
+@ContextConfiguration(initializers = DataNeo4jTestPropertiesIntegrationTests.Initializer.class)
 @DataNeo4jTest(properties = "spring.profiles.active=test")
-public class DataNeo4jTestPropertiesIntegrationTests {
+class DataNeo4jTestPropertiesIntegrationTests {
 
 	@Container
-	public static SkippableContainer<Neo4jContainer<?>> neo4j = new SkippableContainer<>(
-			() -> new Neo4jContainer<>().withAdminPassword(null));
+	static final Neo4jContainer<?> neo4j = new Neo4jContainer<>().withoutAuthentication();
 
 	@Autowired
 	private Environment environment;
 
 	@Test
-	public void environmentWithNewProfile() {
+	void environmentWithNewProfile() {
 		assertThat(this.environment.getActiveProfiles()).containsExactly("test");
 	}
 
-	static class Initializer
-			implements ApplicationContextInitializer<ConfigurableApplicationContext> {
+	static class Initializer implements ApplicationContextInitializer<ConfigurableApplicationContext> {
 
 		@Override
-		public void initialize(
-				ConfigurableApplicationContext configurableApplicationContext) {
-			TestPropertyValues
-					.of("spring.data.neo4j.uri=" + neo4j.getContainer().getBoltUrl())
+		public void initialize(ConfigurableApplicationContext configurableApplicationContext) {
+			TestPropertyValues.of("spring.data.neo4j.uri=" + neo4j.getBoltUrl())
 					.applyTo(configurableApplicationContext.getEnvironment());
 		}
 

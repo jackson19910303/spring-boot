@@ -35,8 +35,9 @@ import org.springframework.boot.actuate.endpoint.web.ExposableWebEndpoint;
 import org.springframework.boot.actuate.endpoint.web.PathMapper;
 import org.springframework.boot.actuate.endpoint.web.WebOperation;
 import org.springframework.boot.actuate.endpoint.web.annotation.EndpointWebExtension;
+import org.springframework.boot.actuate.health.HealthContributorRegistry;
 import org.springframework.boot.actuate.health.HealthEndpoint;
-import org.springframework.boot.actuate.health.HealthIndicator;
+import org.springframework.boot.actuate.health.HealthEndpointGroups;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -50,18 +51,18 @@ import static org.mockito.Mockito.mock;
  *
  * @author Madhura Bhave
  */
-public class CloudFoundryWebEndpointDiscovererTests {
+class CloudFoundryWebEndpointDiscovererTests {
 
 	@Test
-	public void getEndpointsShouldAddCloudFoundryHealthExtension() {
+	void getEndpointsShouldAddCloudFoundryHealthExtension() {
 		load(TestConfiguration.class, (discoverer) -> {
 			Collection<ExposableWebEndpoint> endpoints = discoverer.getEndpoints();
 			assertThat(endpoints.size()).isEqualTo(2);
 			for (ExposableWebEndpoint endpoint : endpoints) {
 				if (endpoint.getEndpointId().equals(EndpointId.of("health"))) {
 					WebOperation operation = findMainReadOperation(endpoint);
-					assertThat(operation.invoke(new InvocationContext(
-							mock(SecurityContext.class), Collections.emptyMap())))
+					assertThat(operation
+							.invoke(new InvocationContext(mock(SecurityContext.class), Collections.emptyMap())))
 									.isEqualTo("cf");
 				}
 			}
@@ -74,30 +75,23 @@ public class CloudFoundryWebEndpointDiscovererTests {
 				return operation;
 			}
 		}
-		throw new IllegalStateException(
-				"No main read operation found from " + endpoint.getOperations());
+		throw new IllegalStateException("No main read operation found from " + endpoint.getOperations());
 	}
 
-	private void load(Class<?> configuration,
-			Consumer<CloudFoundryWebEndpointDiscoverer> consumer) {
+	private void load(Class<?> configuration, Consumer<CloudFoundryWebEndpointDiscoverer> consumer) {
 		this.load((id) -> null, EndpointId::toString, configuration, consumer);
 	}
 
-	private void load(Function<EndpointId, Long> timeToLive,
-			PathMapper endpointPathMapper, Class<?> configuration,
+	private void load(Function<EndpointId, Long> timeToLive, PathMapper endpointPathMapper, Class<?> configuration,
 			Consumer<CloudFoundryWebEndpointDiscoverer> consumer) {
-		try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(
-				configuration)) {
+		try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(configuration)) {
 			ConversionServiceParameterValueMapper parameterMapper = new ConversionServiceParameterValueMapper(
 					DefaultConversionService.getSharedInstance());
-			EndpointMediaTypes mediaTypes = new EndpointMediaTypes(
-					Collections.singletonList("application/json"),
+			EndpointMediaTypes mediaTypes = new EndpointMediaTypes(Collections.singletonList("application/json"),
 					Collections.singletonList("application/json"));
-			CloudFoundryWebEndpointDiscoverer discoverer = new CloudFoundryWebEndpointDiscoverer(
-					context, parameterMapper, mediaTypes,
-					Collections.singletonList(endpointPathMapper),
-					Collections.singleton(new CachingOperationInvokerAdvisor(timeToLive)),
-					Collections.emptyList());
+			CloudFoundryWebEndpointDiscoverer discoverer = new CloudFoundryWebEndpointDiscoverer(context,
+					parameterMapper, mediaTypes, Collections.singletonList(endpointPathMapper),
+					Collections.singleton(new CachingOperationInvokerAdvisor(timeToLive)), Collections.emptyList());
 			consumer.accept(discoverer);
 		}
 	}
@@ -106,27 +100,29 @@ public class CloudFoundryWebEndpointDiscovererTests {
 	static class TestConfiguration {
 
 		@Bean
-		public TestEndpoint testEndpoint() {
+		TestEndpoint testEndpoint() {
 			return new TestEndpoint();
 		}
 
 		@Bean
-		public TestEndpointWebExtension testEndpointWebExtension() {
+		TestEndpointWebExtension testEndpointWebExtension() {
 			return new TestEndpointWebExtension();
 		}
 
 		@Bean
-		public HealthEndpoint healthEndpoint() {
-			return new HealthEndpoint(mock(HealthIndicator.class));
+		HealthEndpoint healthEndpoint() {
+			HealthContributorRegistry registry = mock(HealthContributorRegistry.class);
+			HealthEndpointGroups groups = mock(HealthEndpointGroups.class);
+			return new HealthEndpoint(registry, groups);
 		}
 
 		@Bean
-		public HealthEndpointWebExtension healthEndpointWebExtension() {
+		HealthEndpointWebExtension healthEndpointWebExtension() {
 			return new HealthEndpointWebExtension();
 		}
 
 		@Bean
-		public TestHealthEndpointCloudFoundryExtension testHealthEndpointCloudFoundryExtension() {
+		TestHealthEndpointCloudFoundryExtension testHealthEndpointCloudFoundryExtension() {
 			return new TestHealthEndpointCloudFoundryExtension();
 		}
 
@@ -136,7 +132,7 @@ public class CloudFoundryWebEndpointDiscovererTests {
 	static class TestEndpoint {
 
 		@ReadOperation
-		public Object getAll() {
+		Object getAll() {
 			return null;
 		}
 
@@ -146,7 +142,7 @@ public class CloudFoundryWebEndpointDiscovererTests {
 	static class TestEndpointWebExtension {
 
 		@ReadOperation
-		public Object getAll() {
+		Object getAll() {
 			return null;
 		}
 
@@ -156,7 +152,7 @@ public class CloudFoundryWebEndpointDiscovererTests {
 	static class HealthEndpointWebExtension {
 
 		@ReadOperation
-		public Object getAll() {
+		Object getAll() {
 			return null;
 		}
 
@@ -166,7 +162,7 @@ public class CloudFoundryWebEndpointDiscovererTests {
 	static class TestHealthEndpointCloudFoundryExtension {
 
 		@ReadOperation
-		public Object getAll() {
+		Object getAll() {
 			return "cf";
 		}
 

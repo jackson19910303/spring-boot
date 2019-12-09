@@ -41,6 +41,7 @@ public abstract class TestJarCreator {
 	public static void createTestJar(File file, boolean unpackNested) throws Exception {
 		FileOutputStream fileOutputStream = new FileOutputStream(file);
 		try (JarOutputStream jarOutputStream = new JarOutputStream(fileOutputStream)) {
+			jarOutputStream.setComment("outer");
 			writeManifest(jarOutputStream, "j1");
 			writeEntry(jarOutputStream, "1.dat", 1);
 			writeEntry(jarOutputStream, "2.dat", 2);
@@ -52,23 +53,22 @@ public abstract class TestJarCreator {
 			writeNestedEntry("nested.jar", unpackNested, jarOutputStream);
 			writeNestedEntry("another-nested.jar", unpackNested, jarOutputStream);
 			writeNestedEntry("space nested.jar", unpackNested, jarOutputStream);
-			writeNestedMultiReleaseEntry("multi-release.jar", unpackNested,
-					jarOutputStream);
+			writeNestedMultiReleaseEntry("multi-release.jar", unpackNested, jarOutputStream);
 		}
 	}
 
-	private static void writeNestedEntry(String name, boolean unpackNested,
-			JarOutputStream jarOutputStream) throws Exception {
+	private static void writeNestedEntry(String name, boolean unpackNested, JarOutputStream jarOutputStream)
+			throws Exception {
 		writeNestedEntry(name, unpackNested, jarOutputStream, false);
 	}
 
-	private static void writeNestedMultiReleaseEntry(String name, boolean unpackNested,
-			JarOutputStream jarOutputStream) throws Exception {
+	private static void writeNestedMultiReleaseEntry(String name, boolean unpackNested, JarOutputStream jarOutputStream)
+			throws Exception {
 		writeNestedEntry(name, unpackNested, jarOutputStream, true);
 	}
 
-	private static void writeNestedEntry(String name, boolean unpackNested,
-			JarOutputStream jarOutputStream, boolean multiRelease) throws Exception {
+	private static void writeNestedEntry(String name, boolean unpackNested, JarOutputStream jarOutputStream,
+			boolean multiRelease) throws Exception {
 		JarEntry nestedEntry = new JarEntry(name);
 		byte[] nestedJarData = getNestedJarData(multiRelease);
 		nestedEntry.setSize(nestedJarData.length);
@@ -89,6 +89,7 @@ public abstract class TestJarCreator {
 	private static byte[] getNestedJarData(boolean multiRelease) throws Exception {
 		ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
 		JarOutputStream jarOutputStream = new JarOutputStream(byteArrayOutputStream);
+		jarOutputStream.setComment("nested");
 		writeManifest(jarOutputStream, "j2", multiRelease);
 		if (multiRelease) {
 			writeEntry(jarOutputStream, "multi-release.dat", 8);
@@ -96,6 +97,7 @@ public abstract class TestJarCreator {
 			writeEntry(jarOutputStream, "META-INF/versions/10/multi-release.dat", 10);
 			writeEntry(jarOutputStream, "META-INF/versions/11/multi-release.dat", 11);
 			writeEntry(jarOutputStream, "META-INF/versions/12/multi-release.dat", 12);
+			writeEntry(jarOutputStream, "META-INF/versions/13/multi-release.dat", 13);
 		}
 		else {
 			writeEntry(jarOutputStream, "3.dat", 3);
@@ -106,34 +108,30 @@ public abstract class TestJarCreator {
 		return byteArrayOutputStream.toByteArray();
 	}
 
-	private static void writeManifest(JarOutputStream jarOutputStream, String name)
-			throws Exception {
+	private static void writeManifest(JarOutputStream jarOutputStream, String name) throws Exception {
 		writeManifest(jarOutputStream, name, false);
 	}
 
-	private static void writeManifest(JarOutputStream jarOutputStream, String name,
-			boolean multiRelease) throws Exception {
+	private static void writeManifest(JarOutputStream jarOutputStream, String name, boolean multiRelease)
+			throws Exception {
 		writeDirEntry(jarOutputStream, "META-INF/");
 		Manifest manifest = new Manifest();
 		manifest.getMainAttributes().putValue("Built-By", name);
 		manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
 		if (multiRelease) {
-			manifest.getMainAttributes().putValue("Multi-Release",
-					Boolean.toString(true));
+			manifest.getMainAttributes().putValue("Multi-Release", Boolean.toString(true));
 		}
 		jarOutputStream.putNextEntry(new ZipEntry("META-INF/MANIFEST.MF"));
 		manifest.write(jarOutputStream);
 		jarOutputStream.closeEntry();
 	}
 
-	private static void writeDirEntry(JarOutputStream jarOutputStream, String name)
-			throws IOException {
+	private static void writeDirEntry(JarOutputStream jarOutputStream, String name) throws IOException {
 		jarOutputStream.putNextEntry(new JarEntry(name));
 		jarOutputStream.closeEntry();
 	}
 
-	private static void writeEntry(JarOutputStream jarOutputStream, String name, int data)
-			throws IOException {
+	private static void writeEntry(JarOutputStream jarOutputStream, String name, int data) throws IOException {
 		jarOutputStream.putNextEntry(new JarEntry(name));
 		jarOutputStream.write(new byte[] { (byte) data });
 		jarOutputStream.closeEntry();

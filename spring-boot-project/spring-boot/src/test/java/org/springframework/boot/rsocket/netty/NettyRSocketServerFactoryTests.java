@@ -27,25 +27,22 @@ import io.rsocket.Payload;
 import io.rsocket.RSocket;
 import io.rsocket.RSocketFactory;
 import io.rsocket.SocketAcceptor;
-import io.rsocket.transport.netty.client.TcpClientTransport;
 import io.rsocket.transport.netty.client.WebsocketClientTransport;
 import io.rsocket.util.DefaultPayload;
 import org.assertj.core.api.Assertions;
-import org.junit.After;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import reactor.core.publisher.Mono;
 
 import org.springframework.boot.rsocket.server.RSocketServer;
-import org.springframework.boot.rsocket.server.ServerRSocketFactoryCustomizer;
-import org.springframework.boot.testsupport.rule.OutputCapture;
+import org.springframework.boot.rsocket.server.ServerRSocketFactoryProcessor;
 import org.springframework.core.codec.CharSequenceEncoder;
 import org.springframework.core.codec.StringDecoder;
 import org.springframework.core.io.buffer.NettyDataBufferFactory;
+import org.springframework.http.client.reactive.ReactorResourceFactory;
 import org.springframework.messaging.rsocket.RSocketRequester;
 import org.springframework.messaging.rsocket.RSocketStrategies;
-import org.springframework.util.MimeTypeUtils;
 import org.springframework.util.SocketUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -58,23 +55,21 @@ import static org.mockito.Mockito.mock;
  * Tests for {@link NettyRSocketServerFactory}
  *
  * @author Brian Clozel
+ * @author Leo Li
  */
-public class NettyRSocketServerFactoryTests {
+class NettyRSocketServerFactoryTests {
 
-	@Rule
-	public OutputCapture output = new OutputCapture();
-
-	private NettyRSocketServer rSocketServer;
+	private NettyRSocketServer server;
 
 	private RSocketRequester requester;
 
 	private static final Duration TIMEOUT = Duration.ofSeconds(3);
 
-	@After
-	public void tearDown() {
-		if (this.rSocketServer != null) {
+	@AfterEach
+	void tearDown() {
+		if (this.server != null) {
 			try {
-				this.rSocketServer.stop();
+				this.server.stop();
 			}
 			catch (Exception ex) {
 				// Ignore
@@ -90,82 +85,89 @@ public class NettyRSocketServerFactoryTests {
 	}
 
 	@Test
-	public void specificPort() {
+	void specificPort() {
 		NettyRSocketServerFactory factory = getFactory();
 		int specificPort = SocketUtils.findAvailableTcpPort(41000);
 		factory.setPort(specificPort);
-		this.rSocketServer = factory.create(new EchoRequestResponseAcceptor());
-		this.rSocketServer.start();
-		this.requester = getRSocketRequester(createRSocketTcpClient());
+		this.server = factory.create(new EchoRequestResponseAcceptor());
+		this.server.start();
+		this.requester = createRSocketTcpClient();
 		String payload = "test payload";
-		String response = this.requester.route("test").data(payload)
-				.retrieveMono(String.class).block(TIMEOUT);
-
-		assertThat(response).isEqualTo(payload);
-		assertThat(this.rSocketServer.address().getPort()).isEqualTo(specificPort);
-	}
-
-	@Test
-	public void websocketTransport() {
-		NettyRSocketServerFactory factory = getFactory();
-		factory.setTransport(RSocketServer.TRANSPORT.WEBSOCKET);
-		this.rSocketServer = factory.create(new EchoRequestResponseAcceptor());
-		this.rSocketServer.start();
-		this.requester = getRSocketRequester(createRSocketWebSocketClient());
-		String payload = "test payload";
-		String response = this.requester.route("test").data(payload)
-				.retrieveMono(String.class).block(TIMEOUT);
+		String response = this.requester.route("test").data(payload).retrieveMono(String.class).block(TIMEOUT);
+		assertThat(this.server.address().getPort()).isEqualTo(specificPort);
 		assertThat(response).isEqualTo(payload);
 	}
 
 	@Test
-	public void serverCustomizers() {
+	void websocketTransport() {
 		NettyRSocketServerFactory factory = getFactory();
-		ServerRSocketFactoryCustomizer[] customizers = new ServerRSocketFactoryCustomizer[2];
-		for (int i = 0; i < customizers.length; i++) {
-			customizers[i] = mock(ServerRSocketFactoryCustomizer.class);
-			given(customizers[i].apply(any(RSocketFactory.ServerRSocketFactory.class)))
+		factory.setTransport(RSocketServer.Transport.WEBSOCKET);
+		this.server = factory.create(new EchoRequestResponseAcceptor());
+		this.server.start();
+		this.requester = createRSocketWebSocketClient();
+		String payload = "test payload";
+		String response = this.requester.route("test").data(payload).retrieveMono(String.class).block(TIMEOUT);
+		assertThat(response).isEqualTo(payload);
+	}
+
+	@Test
+	void websocketTransportWithReactorResource() {
+		NettyRSocketServerFactory factory = getFactory();
+		factory.setTransport(RSocketServer.Transport.WEBSOCKET);
+		ReactorResourceFactory resourceFactory = new ReactorResourceFactory();
+		resourceFactory.afterPropertiesSet();
+		factory.setResourceFactory(resourceFactory);
+		int specificPort = SocketUtils.findAvailableTcpPort(41000);
+		factory.setPort(specificPort);
+		this.server = factory.create(new EchoRequestResponseAcceptor());
+		this.server.start();
+		this.requester = createRSocketWebSocketClient();
+		String payload = "test payload";
+		String response = this.requester.route("test").data(payload).retrieveMono(String.class).block(TIMEOUT);
+		assertThat(response).isEqualTo(payload);
+		assertThat(this.server.address().getPort()).isEqualTo(specificPort);
+	}
+
+	@Test
+	void serverProcessors() {
+		NettyRSocketServerFactory factory = getFactory();
+		ServerRSocketFactoryProcessor[] processors = new ServerRSocketFactoryProcessor[2];
+		for (int i = 0; i < processors.length; i++) {
+			processors[i] = mock(ServerRSocketFactoryProcessor.class);
+			given(processors[i].process(any(RSocketFactory.ServerRSocketFactory.class)))
 					.will((invocation) -> invocation.getArgument(0));
 		}
-		factory.setServerCustomizers(Arrays.asList(customizers[0], customizers[1]));
-		this.rSocketServer = factory.create(new EchoRequestResponseAcceptor());
-		InOrder ordered = inOrder((Object[]) customizers);
-		for (ServerRSocketFactoryCustomizer customizer : customizers) {
-			ordered.verify(customizer)
-					.apply(any(RSocketFactory.ServerRSocketFactory.class));
+		factory.setSocketFactoryProcessors(Arrays.asList(processors));
+		this.server = factory.create(new EchoRequestResponseAcceptor());
+		InOrder ordered = inOrder((Object[]) processors);
+		for (ServerRSocketFactoryProcessor processor : processors) {
+			ordered.verify(processor).process(any(RSocketFactory.ServerRSocketFactory.class));
 		}
 	}
 
-	private RSocket createRSocketTcpClient() {
-		Assertions.assertThat(this.rSocketServer).isNotNull();
-		InetSocketAddress address = this.rSocketServer.address();
-		return RSocketFactory.connect().dataMimeType(MimeTypeUtils.TEXT_PLAIN_VALUE)
-				.transport(TcpClientTransport.create(address)).start().block();
+	private RSocketRequester createRSocketTcpClient() {
+		Assertions.assertThat(this.server).isNotNull();
+		InetSocketAddress address = this.server.address();
+		return createRSocketRequesterBuilder().connectTcp(address.getHostString(), address.getPort()).block();
 	}
 
-	private RSocket createRSocketWebSocketClient() {
-		Assertions.assertThat(this.rSocketServer).isNotNull();
-		InetSocketAddress address = this.rSocketServer.address();
-		return RSocketFactory.connect().dataMimeType(MimeTypeUtils.TEXT_PLAIN_VALUE)
-				.transport(WebsocketClientTransport.create(address)).start().block();
+	private RSocketRequester createRSocketWebSocketClient() {
+		Assertions.assertThat(this.server).isNotNull();
+		InetSocketAddress address = this.server.address();
+		return createRSocketRequesterBuilder().connect(WebsocketClientTransport.create(address)).block();
 	}
 
-	private RSocketRequester getRSocketRequester(RSocket rSocketClient) {
-		RSocketStrategies strategies = RSocketStrategies.builder()
-				.decoder(StringDecoder.allMimeTypes())
+	private RSocketRequester.Builder createRSocketRequesterBuilder() {
+		RSocketStrategies strategies = RSocketStrategies.builder().decoder(StringDecoder.allMimeTypes())
 				.encoder(CharSequenceEncoder.allMimeTypes())
-				.dataBufferFactory(
-						new NettyDataBufferFactory(PooledByteBufAllocator.DEFAULT))
-				.build();
-		return RSocketRequester.create(rSocketClient, MimeTypeUtils.TEXT_PLAIN,
-				strategies);
+				.dataBufferFactory(new NettyDataBufferFactory(PooledByteBufAllocator.DEFAULT)).build();
+		return RSocketRequester.builder().rsocketStrategies(strategies);
 	}
 
 	static class EchoRequestResponseAcceptor implements SocketAcceptor {
 
 		@Override
-		public Mono<RSocket> accept(ConnectionSetupPayload setupPayload,
-				RSocket rSocket) {
+		public Mono<RSocket> accept(ConnectionSetupPayload setupPayload, RSocket rSocket) {
 			return Mono.just(new AbstractRSocket() {
 				@Override
 				public Mono<Payload> requestResponse(Payload payload) {

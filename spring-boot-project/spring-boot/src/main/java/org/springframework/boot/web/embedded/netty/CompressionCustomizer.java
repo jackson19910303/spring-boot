@@ -28,6 +28,7 @@ import reactor.netty.http.server.HttpServerRequest;
 import reactor.netty.http.server.HttpServerResponse;
 
 import org.springframework.boot.web.server.Compression;
+import org.springframework.util.InvalidMimeTypeException;
 import org.springframework.util.MimeType;
 import org.springframework.util.MimeTypeUtils;
 import org.springframework.util.ObjectUtils;
@@ -42,8 +43,7 @@ import org.springframework.util.StringUtils;
  */
 final class CompressionCustomizer implements NettyServerCustomizer {
 
-	private static final CompressionPredicate ALWAYS_COMPRESS = (request,
-			response) -> true;
+	private static final CompressionPredicate ALWAYS_COMPRESS = (request, response) -> true;
 
 	private final Compression compression;
 
@@ -54,11 +54,9 @@ final class CompressionCustomizer implements NettyServerCustomizer {
 	@Override
 	public HttpServer apply(HttpServer server) {
 		if (!this.compression.getMinResponseSize().isNegative()) {
-			server = server
-					.compress((int) this.compression.getMinResponseSize().toBytes());
+			server = server.compress((int) this.compression.getMinResponseSize().toBytes());
 		}
-		CompressionPredicate mimeTypes = getMimeTypesPredicate(
-				this.compression.getMimeTypes());
+		CompressionPredicate mimeTypes = getMimeTypesPredicate(this.compression.getMimeTypes());
 		CompressionPredicate excludedUserAgents = getExcludedUserAgentsPredicate(
 				this.compression.getExcludedUserAgents());
 		server = server.compress(mimeTypes.and(excludedUserAgents));
@@ -69,34 +67,35 @@ final class CompressionCustomizer implements NettyServerCustomizer {
 		if (ObjectUtils.isEmpty(mimeTypeValues)) {
 			return ALWAYS_COMPRESS;
 		}
-		List<MimeType> mimeTypes = Arrays.stream(mimeTypeValues)
-				.map(MimeTypeUtils::parseMimeType).collect(Collectors.toList());
+		List<MimeType> mimeTypes = Arrays.stream(mimeTypeValues).map(MimeTypeUtils::parseMimeType)
+				.collect(Collectors.toList());
 		return (request, response) -> {
-			String contentType = response.responseHeaders()
-					.get(HttpHeaderNames.CONTENT_TYPE);
+			String contentType = response.responseHeaders().get(HttpHeaderNames.CONTENT_TYPE);
 			if (StringUtils.isEmpty(contentType)) {
 				return false;
 			}
-			MimeType contentMimeType = MimeTypeUtils.parseMimeType(contentType);
-			return mimeTypes.stream()
-					.anyMatch((candidate) -> candidate.isCompatibleWith(contentMimeType));
+			try {
+				MimeType contentMimeType = MimeTypeUtils.parseMimeType(contentType);
+				return mimeTypes.stream().anyMatch((candidate) -> candidate.isCompatibleWith(contentMimeType));
+			}
+			catch (InvalidMimeTypeException ex) {
+				return false;
+			}
 		};
 	}
 
-	private CompressionPredicate getExcludedUserAgentsPredicate(
-			String[] excludedUserAgents) {
+	private CompressionPredicate getExcludedUserAgentsPredicate(String[] excludedUserAgents) {
 		if (ObjectUtils.isEmpty(excludedUserAgents)) {
 			return ALWAYS_COMPRESS;
 		}
 		return (request, response) -> {
 			HttpHeaders headers = request.requestHeaders();
-			return Arrays.stream(excludedUserAgents).noneMatch((candidate) -> headers
-					.contains(HttpHeaderNames.USER_AGENT, candidate, true));
+			return Arrays.stream(excludedUserAgents)
+					.noneMatch((candidate) -> headers.contains(HttpHeaderNames.USER_AGENT, candidate, true));
 		};
 	}
 
-	private interface CompressionPredicate
-			extends BiPredicate<HttpServerRequest, HttpServerResponse> {
+	private interface CompressionPredicate extends BiPredicate<HttpServerRequest, HttpServerResponse> {
 
 	}
 

@@ -23,9 +23,8 @@ import org.springframework.restdocs.webtestclient.WebTestClientRestDocumentation
 public class AdvancedConfigurationExample {
 
 	// tag::configuration[]
-	@TestConfiguration
-	public static class CustomizationConfiguration
-			implements RestDocsWebTestClientConfigurationCustomizer {
+	@TestConfiguration(proxyBeanMethods = false)
+	public static class CustomizationConfiguration implements RestDocsWebTestClientConfigurationCustomizer {
 
 		@Override
 		public void customize(WebTestClientRestDocumentationConfigurer configurer) {

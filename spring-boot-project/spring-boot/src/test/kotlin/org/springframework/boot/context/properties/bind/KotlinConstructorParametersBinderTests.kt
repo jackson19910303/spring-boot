@@ -1,9 +1,10 @@
 package org.springframework.boot.context.properties.bind
 
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import org.springframework.boot.context.properties.source.ConfigurationPropertyName
 import org.springframework.boot.context.properties.source.MockConfigurationPropertySource
+import org.springframework.core.ResolvableType
 
 /**
  * Tests for `ConstructorParametersBinder`.
@@ -140,12 +141,21 @@ class KotlinConstructorParametersBinderTests {
 	}
 
 	@Test
-	fun `Bind to class with no value and default value should use default value`() {
+	fun `Bind to class with no value and default value should return unbound`() {
 		val source = MockConfigurationPropertySource()
 		source.put("foo.string-value", "foo")
 		val binder = Binder(source)
-		val bean = binder.bind("foo", Bindable.of(
-				ExampleDefaultValueBean::class.java)).get()
+		assertThat(binder.bind("foo", Bindable.of(
+				ExampleDefaultValueBean::class.java)).isBound()).isFalse();
+	}
+
+	@Test
+	fun `Bind or create to class with no value and default value should return default value`() {
+		val source = MockConfigurationPropertySource()
+		source.put("foo.string-value", "foo")
+		val binder = Binder(source)
+		val bean = binder.bindOrCreate("foo", Bindable.of(
+				ExampleDefaultValueBean::class.java))
 		assertThat(bean.intValue).isEqualTo(5)
 		assertThat(bean.stringsList).containsOnly("a", "b", "c")
 		assertThat(bean.customList).containsOnly("x,y,z")
@@ -162,6 +172,19 @@ class KotlinConstructorParametersBinderTests {
 		assertThat(bean.booleanValue).isFalse()
 		assertThat(bean.stringValue).isEqualTo("my data")
 		assertThat(bean.enumValue).isEqualTo(ExampleEnum.FOO_BAR)
+	}
+
+	@Test
+	fun `Bind to data class with generics`() {
+		val source = MockConfigurationPropertySource()
+		source.put("foo.value.bar", "baz")
+		val binder = Binder(source)
+		val type = ResolvableType.forClassWithGenerics(Map::class.java, String::class.java,
+				String::class.java)
+		val bean = binder.bind("foo", Bindable
+				.of<GenericValue<Map<String, String>>>(ResolvableType.forClassWithGenerics(GenericValue::class.java, type)))
+				.get()
+		assertThat(bean.value.get("bar")).isEqualTo("baz");
 	}
 
 	class ExampleValueBean(val intValue: Int?, val longValue: Long?,
@@ -204,5 +227,9 @@ class KotlinConstructorParametersBinderTests {
 									val booleanValue: Boolean = false,
 									val stringValue: String = "my data",
 									val enumValue: ExampleEnum = ExampleEnum.BAR_BAZ)
+
+	data class GenericValue<T>(
+		val value: T
+	)
 
 }

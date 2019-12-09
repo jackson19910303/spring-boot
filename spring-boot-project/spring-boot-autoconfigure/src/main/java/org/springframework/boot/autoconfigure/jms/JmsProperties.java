@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2018 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @author Greg Turnquist
  * @author Phillip Webb
  * @author Stephane Nicoll
+ * @since 1.0.0
  */
 @ConfigurationProperties(prefix = "spring.jms")
 public class JmsProperties {
@@ -154,6 +155,13 @@ public class JmsProperties {
 		 */
 		private Integer maxConcurrency;
 
+		/**
+		 * Timeout to use for receive calls. Use -1 for a no-wait receive or 0 for no
+		 * timeout at all. The latter is only feasible if not running within a transaction
+		 * manager and is generally discouraged since it prevents clean shutdown.
+		 */
+		private Duration receiveTimeout = Duration.ofSeconds(1);
+
 		public boolean isAutoStartup() {
 			return this.autoStartup;
 		}
@@ -190,9 +198,16 @@ public class JmsProperties {
 			if (this.concurrency == null) {
 				return (this.maxConcurrency != null) ? "1-" + this.maxConcurrency : null;
 			}
-			return ((this.maxConcurrency != null)
-					? this.concurrency + "-" + this.maxConcurrency
+			return ((this.maxConcurrency != null) ? this.concurrency + "-" + this.maxConcurrency
 					: String.valueOf(this.concurrency));
+		}
+
+		public Duration getReceiveTimeout() {
+			return this.receiveTimeout;
+		}
+
+		public void setReceiveTimeout(Duration receiveTimeout) {
+			this.receiveTimeout = receiveTimeout;
 		}
 
 	}
@@ -283,8 +298,7 @@ public class JmsProperties {
 			if (this.qosEnabled != null) {
 				return this.qosEnabled;
 			}
-			return (getDeliveryMode() != null || getPriority() != null
-					|| getTimeToLive() != null);
+			return (getDeliveryMode() != null || getPriority() != null || getTimeToLive() != null);
 		}
 
 		public Boolean getQosEnabled() {

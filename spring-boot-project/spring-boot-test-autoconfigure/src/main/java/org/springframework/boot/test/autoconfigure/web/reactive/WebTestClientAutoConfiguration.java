@@ -28,6 +28,7 @@ import org.springframework.boot.autoconfigure.http.codec.CodecsAutoConfiguration
 import org.springframework.boot.autoconfigure.web.reactive.WebFluxAutoConfiguration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.test.web.reactive.server.WebTestClientBuilderCustomizer;
 import org.springframework.boot.web.codec.CodecCustomizer;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
@@ -56,10 +57,8 @@ public class WebTestClientAutoConfiguration {
 	@ConditionalOnMissingBean
 	@ConditionalOnBean(WebHandler.class)
 	public WebTestClient webTestClient(ApplicationContext applicationContext,
-			List<WebTestClientBuilderCustomizer> customizers,
-			List<MockServerConfigurer> configurers) {
-		WebTestClient.MockServerSpec<?> mockServerSpec = WebTestClient
-				.bindToApplicationContext(applicationContext);
+			List<WebTestClientBuilderCustomizer> customizers, List<MockServerConfigurer> configurers) {
+		WebTestClient.MockServerSpec<?> mockServerSpec = WebTestClient.bindToApplicationContext(applicationContext);
 		for (MockServerConfigurer configurer : configurers) {
 			mockServerSpec.apply(configurer);
 		}

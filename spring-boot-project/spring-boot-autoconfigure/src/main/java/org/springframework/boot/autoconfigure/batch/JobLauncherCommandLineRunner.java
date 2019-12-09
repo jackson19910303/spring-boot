@@ -51,6 +51,7 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.ApplicationEventPublisherAware;
 import org.springframework.core.Ordered;
+import org.springframework.core.log.LogMessage;
 import org.springframework.util.Assert;
 import org.springframework.util.PatternMatchUtils;
 import org.springframework.util.StringUtils;
@@ -63,17 +64,16 @@ import org.springframework.util.StringUtils;
  * @author Dave Syer
  * @author Jean-Pierre Bergamin
  * @author Mahmoud Ben Hassine
+ * @since 1.0.0
  */
-public class JobLauncherCommandLineRunner
-		implements CommandLineRunner, Ordered, ApplicationEventPublisherAware {
+public class JobLauncherCommandLineRunner implements CommandLineRunner, Ordered, ApplicationEventPublisherAware {
 
 	/**
 	 * The default order for the command line runner.
 	 */
 	public static final int DEFAULT_ORDER = 0;
 
-	private static final Log logger = LogFactory
-			.getLog(JobLauncherCommandLineRunner.class);
+	private static final Log logger = LogFactory.getLog(JobLauncherCommandLineRunner.class);
 
 	private JobParametersConverter converter = new DefaultJobParametersConverter();
 
@@ -100,8 +100,7 @@ public class JobLauncherCommandLineRunner
 	 * @param jobRepository to check if a job instance exists with the given parameters
 	 * when running a job
 	 */
-	public JobLauncherCommandLineRunner(JobLauncher jobLauncher, JobExplorer jobExplorer,
-			JobRepository jobRepository) {
+	public JobLauncherCommandLineRunner(JobLauncher jobLauncher, JobExplorer jobExplorer, JobRepository jobRepository) {
 		Assert.notNull(jobLauncher, "JobLauncher must not be null");
 		Assert.notNull(jobExplorer, "JobExplorer must not be null");
 		Assert.notNull(jobRepository, "JobRepository must not be null");
@@ -149,20 +148,18 @@ public class JobLauncherCommandLineRunner
 		launchJobFromProperties(StringUtils.splitArrayElementsIntoProperties(args, "="));
 	}
 
-	protected void launchJobFromProperties(Properties properties)
-			throws JobExecutionException {
+	protected void launchJobFromProperties(Properties properties) throws JobExecutionException {
 		JobParameters jobParameters = this.converter.getJobParameters(properties);
 		executeLocalJobs(jobParameters);
 		executeRegisteredJobs(jobParameters);
 	}
 
-	private void executeLocalJobs(JobParameters jobParameters)
-			throws JobExecutionException {
+	private void executeLocalJobs(JobParameters jobParameters) throws JobExecutionException {
 		for (Job job : this.jobs) {
 			if (StringUtils.hasText(this.jobNames)) {
 				String[] jobsToRun = this.jobNames.split(",");
 				if (!PatternMatchUtils.simpleMatch(jobsToRun, job.getName())) {
-					logger.debug("Skipped job: " + job.getName());
+					logger.debug(LogMessage.format("Skipped job: %s", job.getName()));
 					continue;
 				}
 			}
@@ -170,8 +167,7 @@ public class JobLauncherCommandLineRunner
 		}
 	}
 
-	private void executeRegisteredJobs(JobParameters jobParameters)
-			throws JobExecutionException {
+	private void executeRegisteredJobs(JobParameters jobParameters) throws JobExecutionException {
 		if (this.jobRegistry != null && StringUtils.hasText(this.jobNames)) {
 			String[] jobsToRun = this.jobNames.split(",");
 			for (String jobName : jobsToRun) {
@@ -183,16 +179,15 @@ public class JobLauncherCommandLineRunner
 					execute(job, jobParameters);
 				}
 				catch (NoSuchJobException ex) {
-					logger.debug("No job found in registry for job name: " + jobName);
+					logger.debug(LogMessage.format("No job found in registry for job name: %s", jobName));
 				}
 			}
 		}
 	}
 
 	protected void execute(Job job, JobParameters jobParameters)
-			throws JobExecutionAlreadyRunningException, JobRestartException,
-			JobInstanceAlreadyCompleteException, JobParametersInvalidException,
-			JobParametersNotFoundException {
+			throws JobExecutionAlreadyRunningException, JobRestartException, JobInstanceAlreadyCompleteException,
+			JobParametersInvalidException, JobParametersNotFoundException {
 		JobParameters parameters = getNextJobParameters(job, jobParameters);
 		JobExecution execution = this.jobLauncher.run(job, parameters);
 		if (this.publisher != null) {
@@ -201,25 +196,21 @@ public class JobLauncherCommandLineRunner
 	}
 
 	private JobParameters getNextJobParameters(Job job, JobParameters jobParameters) {
-		if (this.jobRepository != null
-				&& this.jobRepository.isJobInstanceExists(job.getName(), jobParameters)) {
+		if (this.jobRepository != null && this.jobRepository.isJobInstanceExists(job.getName(), jobParameters)) {
 			return getNextJobParametersForExisting(job, jobParameters);
 		}
 		if (job.getJobParametersIncrementer() == null) {
 			return jobParameters;
 		}
-		JobParameters nextParameters = new JobParametersBuilder(jobParameters,
-				this.jobExplorer).getNextJobParameters(job).toJobParameters();
+		JobParameters nextParameters = new JobParametersBuilder(jobParameters, this.jobExplorer)
+				.getNextJobParameters(job).toJobParameters();
 		return merge(nextParameters, jobParameters);
 	}
 
-	private JobParameters getNextJobParametersForExisting(Job job,
-			JobParameters jobParameters) {
-		JobExecution lastExecution = this.jobRepository.getLastJobExecution(job.getName(),
-				jobParameters);
+	private JobParameters getNextJobParametersForExisting(Job job, JobParameters jobParameters) {
+		JobExecution lastExecution = this.jobRepository.getLastJobExecution(job.getName(), jobParameters);
 		if (isStoppedOrFailed(lastExecution) && job.isRestartable()) {
-			JobParameters previousIdentifyingParameters = getGetIdentifying(
-					lastExecution.getJobParameters());
+			JobParameters previousIdentifyingParameters = getGetIdentifying(lastExecution.getJobParameters());
 			return merge(previousIdentifyingParameters, jobParameters);
 		}
 		return jobParameters;
@@ -231,8 +222,7 @@ public class JobLauncherCommandLineRunner
 	}
 
 	private JobParameters getGetIdentifying(JobParameters parameters) {
-		HashMap<String, JobParameter> nonIdentifying = new LinkedHashMap<>(
-				parameters.getParameters().size());
+		HashMap<String, JobParameter> nonIdentifying = new LinkedHashMap<>(parameters.getParameters().size());
 		parameters.getParameters().forEach((key, value) -> {
 			if (value.isIdentifying()) {
 				nonIdentifying.put(key, value);

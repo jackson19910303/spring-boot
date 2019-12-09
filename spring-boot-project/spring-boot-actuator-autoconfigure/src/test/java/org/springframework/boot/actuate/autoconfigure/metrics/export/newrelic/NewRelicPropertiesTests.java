@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2018 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,15 +28,25 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Stephane Nicoll
  */
-public class NewRelicPropertiesTests extends StepRegistryPropertiesTests {
+class NewRelicPropertiesTests extends StepRegistryPropertiesTests {
 
 	@Test
-	public void defaultValuesAreConsistent() {
+	void defaultValuesAreConsistent() {
 		NewRelicProperties properties = new NewRelicProperties();
 		NewRelicConfig config = (key) -> null;
 		assertStepRegistryDefaultValues(properties, config);
 		// apiKey and account are mandatory
 		assertThat(properties.getUri()).isEqualTo(config.uri());
+		assertThat(properties.isMeterNameEventTypeEnabled()).isEqualTo(config.meterNameEventTypeEnabled());
+	}
+
+	@Test
+	void eventTypeDefaultValueIsOverriden() {
+		NewRelicProperties properties = new NewRelicProperties();
+		NewRelicConfig config = (key) -> null;
+		assertThat(properties.getEventType()).isNotEqualTo(config.eventType());
+		assertThat(properties.getEventType()).isEqualTo("SpringBootSample");
+		assertThat(config.eventType()).isEqualTo("MicrometerSample");
 	}
 
 }

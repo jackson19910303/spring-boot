@@ -16,11 +16,10 @@
 
 package org.springframework.boot.gradle.plugin;
 
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.TestTemplate;
+import org.junit.jupiter.api.extension.ExtendWith;
 
-import org.springframework.boot.gradle.junit.GradleCompatibilitySuite;
+import org.springframework.boot.gradle.junit.GradleCompatibilityExtension;
 import org.springframework.boot.gradle.testkit.GradleBuild;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,37 +29,33 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * @author Andy Wilkinson
  */
-@RunWith(GradleCompatibilitySuite.class)
-public class KotlinPluginActionIntegrationTests {
+@ExtendWith(GradleCompatibilityExtension.class)
+class KotlinPluginActionIntegrationTests {
 
-	@Rule
-	public GradleBuild gradleBuild;
+	GradleBuild gradleBuild;
 
-	@Test
-	public void noKotlinVersionPropertyWithoutKotlinPlugin() {
-		assertThat(this.gradleBuild.build("kotlinVersion").getOutput())
-				.contains("Kotlin version: none");
+	@TestTemplate
+	void noKotlinVersionPropertyWithoutKotlinPlugin() {
+		assertThat(this.gradleBuild.build("kotlinVersion").getOutput()).contains("Kotlin version: none");
 	}
 
-	@Test
-	public void kotlinVersionPropertyIsSet() {
-		String output = this.gradleBuild.build("kotlinVersion", "dependencies",
-				"--configuration", "compileClasspath").getOutput();
+	@TestTemplate
+	void kotlinVersionPropertyIsSet() {
+		String output = this.gradleBuild.build("kotlinVersion", "dependencies", "--configuration", "compileClasspath")
+				.getOutput();
 		assertThat(output).containsPattern("Kotlin version: [0-9]\\.[0-9]\\.[0-9]+");
 	}
 
-	@Test
-	public void kotlinCompileTasksUseJavaParametersFlagByDefault() {
+	@TestTemplate
+	void kotlinCompileTasksUseJavaParametersFlagByDefault() {
 		assertThat(this.gradleBuild.build("kotlinCompileTasksJavaParameters").getOutput())
-				.contains("compileKotlin java parameters: true")
-				.contains("compileTestKotlin java parameters: true");
+				.contains("compileKotlin java parameters: true").contains("compileTestKotlin java parameters: true");
 	}
 
-	@Test
-	public void kotlinCompileTasksCanOverrideDefaultJavaParametersFlag() {
+	@TestTemplate
+	void kotlinCompileTasksCanOverrideDefaultJavaParametersFlag() {
 		assertThat(this.gradleBuild.build("kotlinCompileTasksJavaParameters").getOutput())
-				.contains("compileKotlin java parameters: false")
-				.contains("compileTestKotlin java parameters: false");
+				.contains("compileKotlin java parameters: false").contains("compileTestKotlin java parameters: false");
 	}
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,8 +25,7 @@ import javax.sql.DataSource;
  * @author Stephane Nicoll
  * @since 2.0.0
  */
-public abstract class AbstractDataSourcePoolMetadata<T extends DataSource>
-		implements DataSourcePoolMetadata {
+public abstract class AbstractDataSourcePoolMetadata<T extends DataSource> implements DataSourcePoolMetadata {
 
 	private final T dataSource;
 
@@ -46,10 +45,10 @@ public abstract class AbstractDataSourcePoolMetadata<T extends DataSource>
 			return null;
 		}
 		if (maxSize < 0) {
-			return -1F;
+			return -1f;
 		}
 		if (currentSize == 0) {
-			return 0F;
+			return 0f;
 		}
 		return (float) currentSize / (float) maxSize;
 	}

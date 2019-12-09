@@ -41,62 +41,56 @@ import static org.mockito.Mockito.verify;
  * @author Stephane Nicoll
  * @author Mark Paluch
  * @author Nikolay Rybak
+ * @author Artsiom Yudovin
  */
-public class RedisReactiveHealthIndicatorTests {
+class RedisReactiveHealthIndicatorTests {
 
 	@Test
-	public void redisIsUp() {
+	void redisIsUp() {
 		Properties info = new Properties();
 		info.put("redis_version", "2.8.9");
 		ReactiveRedisConnection redisConnection = mock(ReactiveRedisConnection.class);
+		given(redisConnection.closeLater()).willReturn(Mono.empty());
 		ReactiveServerCommands commands = mock(ReactiveServerCommands.class);
 		given(commands.info()).willReturn(Mono.just(info));
-		RedisReactiveHealthIndicator healthIndicator = createHealthIndicator(
-				redisConnection, commands);
+		RedisReactiveHealthIndicator healthIndicator = createHealthIndicator(redisConnection, commands);
 		Mono<Health> health = healthIndicator.health();
 		StepVerifier.create(health).consumeNextWith((h) -> {
 			assertThat(h.getStatus()).isEqualTo(Status.UP);
 			assertThat(h.getDetails()).containsOnlyKeys("version");
 			assertThat(h.getDetails().get("version")).isEqualTo("2.8.9");
 		}).verifyComplete();
-		verify(redisConnection).close();
+		verify(redisConnection).closeLater();
 	}
 
 	@Test
-	public void redisCommandIsDown() {
+	void redisCommandIsDown() {
 		ReactiveServerCommands commands = mock(ReactiveServerCommands.class);
-		given(commands.info()).willReturn(
-				Mono.error(new RedisConnectionFailureException("Connection failed")));
+		given(commands.info()).willReturn(Mono.error(new RedisConnectionFailureException("Connection failed")));
 		ReactiveRedisConnection redisConnection = mock(ReactiveRedisConnection.class);
-		RedisReactiveHealthIndicator healthIndicator = createHealthIndicator(
-				redisConnection, commands);
+		given(redisConnection.closeLater()).willReturn(Mono.empty());
+		RedisReactiveHealthIndicator healthIndicator = createHealthIndicator(redisConnection, commands);
 		Mono<Health> health = healthIndicator.health();
-		StepVerifier.create(health)
-				.consumeNextWith((h) -> assertThat(h.getStatus()).isEqualTo(Status.DOWN))
+		StepVerifier.create(health).consumeNextWith((h) -> assertThat(h.getStatus()).isEqualTo(Status.DOWN))
 				.verifyComplete();
-		verify(redisConnection).close();
+		verify(redisConnection).closeLater();
 	}
 
 	@Test
-	public void redisConnectionIsDown() {
-		ReactiveRedisConnectionFactory redisConnectionFactory = mock(
-				ReactiveRedisConnectionFactory.class);
-		given(redisConnectionFactory.getReactiveConnection()).willThrow(
-				new RedisConnectionException("Unable to connect to localhost:6379"));
-		RedisReactiveHealthIndicator healthIndicator = new RedisReactiveHealthIndicator(
-				redisConnectionFactory);
+	void redisConnectionIsDown() {
+		ReactiveRedisConnectionFactory redisConnectionFactory = mock(ReactiveRedisConnectionFactory.class);
+		given(redisConnectionFactory.getReactiveConnection())
+				.willThrow(new RedisConnectionException("Unable to connect to localhost:6379"));
+		RedisReactiveHealthIndicator healthIndicator = new RedisReactiveHealthIndicator(redisConnectionFactory);
 		Mono<Health> health = healthIndicator.health();
-		StepVerifier.create(health)
-				.consumeNextWith((h) -> assertThat(h.getStatus()).isEqualTo(Status.DOWN))
+		StepVerifier.create(health).consumeNextWith((h) -> assertThat(h.getStatus()).isEqualTo(Status.DOWN))
 				.verifyComplete();
 	}
 
-	private RedisReactiveHealthIndicator createHealthIndicator(
-			ReactiveRedisConnection redisConnection,
+	private RedisReactiveHealthIndicator createHealthIndicator(ReactiveRedisConnection redisConnection,
 			ReactiveServerCommands serverCommands) {
 
-		ReactiveRedisConnectionFactory redisConnectionFactory = mock(
-				ReactiveRedisConnectionFactory.class);
+		ReactiveRedisConnectionFactory redisConnectionFactory = mock(ReactiveRedisConnectionFactory.class);
 		given(redisConnectionFactory.getReactiveConnection()).willReturn(redisConnection);
 		given(redisConnection.serverCommands()).willReturn(serverCommands);
 		return new RedisReactiveHealthIndicator(redisConnectionFactory);

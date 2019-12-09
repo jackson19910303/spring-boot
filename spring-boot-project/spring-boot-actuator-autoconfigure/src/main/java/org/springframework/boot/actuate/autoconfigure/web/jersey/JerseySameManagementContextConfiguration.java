@@ -35,11 +35,12 @@ import org.springframework.context.annotation.Import;
  * infrastructure when the management context is the same as the main application context.
  *
  * @author Madhura Bhave
+ * @since 2.1.0
  */
 @ManagementContextConfiguration(ManagementContextType.SAME)
-@ConditionalOnMissingBean(ResourceConfig.class)
 @Import(JerseyManagementContextConfiguration.class)
 @EnableConfigurationProperties(JerseyProperties.class)
+@ConditionalOnMissingBean(ResourceConfig.class)
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 @ConditionalOnClass(ResourceConfig.class)
 @ConditionalOnMissingClass("org.springframework.web.servlet.DispatcherServlet")
@@ -47,8 +48,7 @@ public class JerseySameManagementContextConfiguration {
 
 	@Bean
 	@ConditionalOnMissingBean(JerseyApplicationPath.class)
-	public JerseyApplicationPath jerseyApplicationPath(JerseyProperties properties,
-			ResourceConfig config) {
+	public JerseyApplicationPath jerseyApplicationPath(JerseyProperties properties, ResourceConfig config) {
 		return new DefaultJerseyApplicationPath(properties.getApplicationPath(), config);
 	}
 

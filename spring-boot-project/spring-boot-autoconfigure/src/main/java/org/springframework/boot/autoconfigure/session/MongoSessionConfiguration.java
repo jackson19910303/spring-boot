@@ -27,7 +27,7 @@ import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.session.SessionRepository;
-import org.springframework.session.data.mongo.MongoOperationsSessionRepository;
+import org.springframework.session.data.mongo.MongoIndexedSessionRepository;
 import org.springframework.session.data.mongo.config.annotation.web.http.MongoHttpSessionConfiguration;
 
 /**
@@ -37,7 +37,7 @@ import org.springframework.session.data.mongo.config.annotation.web.http.MongoHt
  * @author Stephane Nicoll
  */
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnClass({ MongoOperations.class, MongoOperationsSessionRepository.class })
+@ConditionalOnClass({ MongoOperations.class, MongoIndexedSessionRepository.class })
 @ConditionalOnMissingBean(SessionRepository.class)
 @ConditionalOnBean(MongoOperations.class)
 @Conditional(ServletSessionCondition.class)
@@ -45,12 +45,10 @@ import org.springframework.session.data.mongo.config.annotation.web.http.MongoHt
 class MongoSessionConfiguration {
 
 	@Configuration
-	public static class SpringBootMongoHttpSessionConfiguration
-			extends MongoHttpSessionConfiguration {
+	public static class SpringBootMongoHttpSessionConfiguration extends MongoHttpSessionConfiguration {
 
 		@Autowired
-		public void customize(SessionProperties sessionProperties,
-				MongoSessionProperties mongoSessionProperties) {
+		public void customize(SessionProperties sessionProperties, MongoSessionProperties mongoSessionProperties) {
 			Duration timeout = sessionProperties.getTimeout();
 			if (timeout != null) {
 				setMaxInactiveIntervalInSeconds((int) timeout.getSeconds());

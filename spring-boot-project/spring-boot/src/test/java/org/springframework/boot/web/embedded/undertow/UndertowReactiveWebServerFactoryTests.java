@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2018 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,9 +23,9 @@ import java.time.Duration;
 import java.util.Arrays;
 
 import io.undertow.Undertow;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.awaitility.Awaitility;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.InOrder;
 import reactor.core.publisher.Mono;
 
@@ -37,6 +37,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -47,11 +48,10 @@ import static org.mockito.Mockito.mock;
  * @author Brian Clozel
  * @author Madhura Bhave
  */
-public class UndertowReactiveWebServerFactoryTests
-		extends AbstractReactiveWebServerFactoryTests {
+class UndertowReactiveWebServerFactoryTests extends AbstractReactiveWebServerFactoryTests {
 
-	@Rule
-	public TemporaryFolder temporaryFolder = new TemporaryFolder();
+	@TempDir
+	File tempDir;
 
 	@Override
 	protected UndertowReactiveWebServerFactory getFactory() {
@@ -59,23 +59,22 @@ public class UndertowReactiveWebServerFactoryTests
 	}
 
 	@Test
-	public void setNullBuilderCustomizersShouldThrowException() {
+	void setNullBuilderCustomizersShouldThrowException() {
+		UndertowReactiveWebServerFactory factory = getFactory();
+		assertThatIllegalArgumentException().isThrownBy(() -> factory.setBuilderCustomizers(null))
+				.withMessageContaining("Customizers must not be null");
+	}
+
+	@Test
+	void addNullBuilderCustomizersShouldThrowException() {
 		UndertowReactiveWebServerFactory factory = getFactory();
 		assertThatIllegalArgumentException()
-				.isThrownBy(() -> factory.setBuilderCustomizers(null))
+				.isThrownBy(() -> factory.addBuilderCustomizers((UndertowBuilderCustomizer[]) null))
 				.withMessageContaining("Customizers must not be null");
 	}
 
 	@Test
-	public void addNullBuilderCustomizersShouldThrowException() {
-		UndertowReactiveWebServerFactory factory = getFactory();
-		assertThatIllegalArgumentException().isThrownBy(
-				() -> factory.addBuilderCustomizers((UndertowBuilderCustomizer[]) null))
-				.withMessageContaining("Customizers must not be null");
-	}
-
-	@Test
-	public void builderCustomizersShouldBeInvoked() {
+	void builderCustomizersShouldBeInvoked() {
 		UndertowReactiveWebServerFactory factory = getFactory();
 		HttpHandler handler = mock(HttpHandler.class);
 		UndertowBuilderCustomizer[] customizers = new UndertowBuilderCustomizer[4];
@@ -90,21 +89,19 @@ public class UndertowReactiveWebServerFactoryTests
 	}
 
 	@Test
-	public void useForwardedHeaders() {
+	void useForwardedHeaders() {
 		UndertowReactiveWebServerFactory factory = getFactory();
 		factory.setUseForwardHeaders(true);
 		assertForwardHeaderIsUsed(factory);
 	}
 
 	@Test
-	public void accessLogCanBeEnabled()
-			throws IOException, URISyntaxException, InterruptedException {
+	void accessLogCanBeEnabled() throws IOException, URISyntaxException, InterruptedException {
 		testAccessLog(null, null, "access_log.log");
 	}
 
 	@Test
-	public void accessLogCanBeCustomized()
-			throws IOException, URISyntaxException, InterruptedException {
+	void accessLogCanBeCustomized() throws IOException, URISyntaxException, InterruptedException {
 		testAccessLog("my_access.", "logz", "my_access.logz");
 	}
 
@@ -114,14 +111,14 @@ public class UndertowReactiveWebServerFactoryTests
 		factory.setAccessLogEnabled(true);
 		factory.setAccessLogPrefix(prefix);
 		factory.setAccessLogSuffix(suffix);
-		File accessLogDirectory = this.temporaryFolder.getRoot();
+		File accessLogDirectory = this.tempDir;
 		factory.setAccessLogDirectory(accessLogDirectory);
 		assertThat(accessLogDirectory.listFiles()).isEmpty();
 		this.webServer = factory.getWebServer(new EchoHandler());
 		this.webServer.start();
 		WebClient client = getWebClient().build();
 		Mono<String> result = client.post().uri("/test").contentType(MediaType.TEXT_PLAIN)
-				.body(BodyInserters.fromObject("Hello World")).exchange()
+				.body(BodyInserters.fromValue("Hello World")).exchange()
 				.flatMap((response) -> response.bodyToMono(String.class));
 		assertThat(result.block(Duration.ofSeconds(30))).isEqualTo("Hello World");
 		File accessLog = new File(accessLogDirectory, expectedFile);
@@ -129,11 +126,8 @@ public class UndertowReactiveWebServerFactoryTests
 		assertThat(accessLogDirectory.listFiles()).contains(accessLog);
 	}
 
-	private void awaitFile(File file) throws InterruptedException {
-		long end = System.currentTimeMillis() + 10000;
-		while (!file.exists() && System.currentTimeMillis() < end) {
-			Thread.sleep(100);
-		}
+	private void awaitFile(File file) {
+		Awaitility.waitAtMost(Duration.ofSeconds(10)).until(file::exists, is(true));
 	}
 
 }

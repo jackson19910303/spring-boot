@@ -21,7 +21,7 @@ import java.util.regex.Pattern;
 
 import io.micrometer.core.instrument.Tag;
 
-import org.springframework.http.HttpStatus;
+import org.springframework.boot.actuate.metrics.http.Outcome;
 import org.springframework.http.client.reactive.ClientHttpRequest;
 import org.springframework.web.reactive.function.client.ClientRequest;
 import org.springframework.web.reactive.function.client.ClientResponse;
@@ -37,29 +37,15 @@ import org.springframework.web.reactive.function.client.WebClient;
  */
 public final class WebClientExchangeTags {
 
-	private static final String URI_TEMPLATE_ATTRIBUTE = WebClient.class.getName()
-			+ ".uriTemplate";
+	private static final String URI_TEMPLATE_ATTRIBUTE = WebClient.class.getName() + ".uriTemplate";
 
 	private static final Tag IO_ERROR = Tag.of("status", "IO_ERROR");
 
 	private static final Tag CLIENT_ERROR = Tag.of("status", "CLIENT_ERROR");
 
-	private static final Pattern PATTERN_BEFORE_PATH = Pattern
-			.compile("^https?://[^/]+/");
+	private static final Pattern PATTERN_BEFORE_PATH = Pattern.compile("^https?://[^/]+/");
 
 	private static final Tag CLIENT_NAME_NONE = Tag.of("clientName", "none");
-
-	private static final Tag OUTCOME_UNKNOWN = Tag.of("outcome", "UNKNOWN");
-
-	private static final Tag OUTCOME_INFORMATIONAL = Tag.of("outcome", "INFORMATIONAL");
-
-	private static final Tag OUTCOME_SUCCESS = Tag.of("outcome", "SUCCESS");
-
-	private static final Tag OUTCOME_REDIRECTION = Tag.of("outcome", "REDIRECTION");
-
-	private static final Tag OUTCOME_CLIENT_ERROR = Tag.of("outcome", "CLIENT_ERROR");
-
-	private static final Tag OUTCOME_SERVER_ERROR = Tag.of("outcome", "SERVER_ERROR");
 
 	private WebClientExchangeTags() {
 	}
@@ -80,8 +66,7 @@ public final class WebClientExchangeTags {
 	 * @return the uri tag
 	 */
 	public static Tag uri(ClientRequest request) {
-		String uri = (String) request.attribute(URI_TEMPLATE_ATTRIBUTE)
-				.orElseGet(() -> request.url().getPath());
+		String uri = (String) request.attribute(URI_TEMPLATE_ATTRIBUTE).orElseGet(() -> request.url().getPath());
 		return Tag.of("uri", extractPath(uri));
 	}
 
@@ -97,7 +82,7 @@ public final class WebClientExchangeTags {
 	 * @return the status tag
 	 */
 	public static Tag status(ClientResponse response) {
-		return Tag.of("status", String.valueOf(response.statusCode().value()));
+		return Tag.of("status", String.valueOf(response.rawStatusCode()));
 	}
 
 	/**
@@ -127,36 +112,14 @@ public final class WebClientExchangeTags {
 
 	/**
 	 * Creates an {@code outcome} {@code Tag} derived from the
-	 * {@link ClientResponse#statusCode() status} of the given {@code response}.
+	 * {@link ClientResponse#rawStatusCode() status} of the given {@code response}.
 	 * @param response the response
 	 * @return the outcome tag
 	 * @since 2.2.0
 	 */
 	public static Tag outcome(ClientResponse response) {
-		try {
-			if (response != null) {
-				HttpStatus status = response.statusCode();
-				if (status.is1xxInformational()) {
-					return OUTCOME_INFORMATIONAL;
-				}
-				if (status.is2xxSuccessful()) {
-					return OUTCOME_SUCCESS;
-				}
-				if (status.is3xxRedirection()) {
-					return OUTCOME_REDIRECTION;
-				}
-				if (status.is4xxClientError()) {
-					return OUTCOME_CLIENT_ERROR;
-				}
-				if (status.is5xxServerError()) {
-					return OUTCOME_SERVER_ERROR;
-				}
-			}
-			return OUTCOME_UNKNOWN;
-		}
-		catch (IllegalArgumentException exc) {
-			return OUTCOME_UNKNOWN;
-		}
+		Outcome outcome = (response != null) ? Outcome.forStatus(response.rawStatusCode()) : Outcome.UNKNOWN;
+		return outcome.asTag();
 	}
 
 }

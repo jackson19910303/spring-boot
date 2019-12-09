@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2018 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,12 +16,19 @@
 
 package org.springframework.boot.actuate.endpoint.invoker.cache;
 
+import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import org.springframework.boot.actuate.endpoint.InvocationContext;
+import org.springframework.boot.actuate.endpoint.http.ApiVersion;
 import org.springframework.boot.actuate.endpoint.invoke.OperationInvoker;
 import org.springframework.util.Assert;
+import org.springframework.util.ClassUtils;
 import org.springframework.util.ObjectUtils;
 
 /**
@@ -29,15 +36,19 @@ import org.springframework.util.ObjectUtils;
  * configurable time to live.
  *
  * @author Stephane Nicoll
+ * @author Christoph Dreis
+ * @author Phillip Webb
  * @since 2.0.0
  */
 public class CachingOperationInvoker implements OperationInvoker {
+
+	private static final boolean IS_REACTOR_PRESENT = ClassUtils.isPresent("reactor.core.publisher.Mono", null);
 
 	private final OperationInvoker invoker;
 
 	private final long timeToLive;
 
-	private volatile CachedResponse cachedResponse;
+	private final Map<ApiVersion, CachedResponse> cachedResponses;
 
 	/**
 	 * Create a new instance with the target {@link OperationInvoker} to use to compute
@@ -49,6 +60,7 @@ public class CachingOperationInvoker implements OperationInvoker {
 		Assert.isTrue(timeToLive > 0, "TimeToLive must be strictly positive");
 		this.invoker = invoker;
 		this.timeToLive = timeToLive;
+		this.cachedResponses = new ConcurrentHashMap<>();
 	}
 
 	/**
@@ -65,11 +77,12 @@ public class CachingOperationInvoker implements OperationInvoker {
 			return this.invoker.invoke(context);
 		}
 		long accessTime = System.currentTimeMillis();
-		CachedResponse cached = this.cachedResponse;
+		ApiVersion contextApiVersion = context.getApiVersion();
+		CachedResponse cached = this.cachedResponses.get(contextApiVersion);
 		if (cached == null || cached.isStale(accessTime, this.timeToLive)) {
 			Object response = this.invoker.invoke(context);
-			this.cachedResponse = new CachedResponse(response, accessTime);
-			return response;
+			cached = createCachedResponse(response, accessTime);
+			this.cachedResponses.put(contextApiVersion, cached);
 		}
 		return cached.getResponse();
 	}
@@ -83,6 +96,13 @@ public class CachingOperationInvoker implements OperationInvoker {
 			return arguments.values().stream().anyMatch(Objects::nonNull);
 		}
 		return false;
+	}
+
+	private CachedResponse createCachedResponse(Object response, long accessTime) {
+		if (IS_REACTOR_PRESENT) {
+			return new ReactiveCachedResponse(response, accessTime, this.timeToLive);
+		}
+		return new CachedResponse(response, accessTime);
 	}
 
 	/**
@@ -114,12 +134,33 @@ public class CachingOperationInvoker implements OperationInvoker {
 			this.creationTime = creationTime;
 		}
 
-		public boolean isStale(long accessTime, long timeToLive) {
+		boolean isStale(long accessTime, long timeToLive) {
 			return (accessTime - this.creationTime) >= timeToLive;
 		}
 
-		public Object getResponse() {
+		Object getResponse() {
 			return this.response;
+		}
+
+	}
+
+	/**
+	 * {@link CachedResponse} variant used when Reactor is present.
+	 */
+	static class ReactiveCachedResponse extends CachedResponse {
+
+		ReactiveCachedResponse(Object response, long creationTime, long timeToLive) {
+			super(applyCaching(response, timeToLive), creationTime);
+		}
+
+		private static Object applyCaching(Object response, long timeToLive) {
+			if (response instanceof Mono) {
+				return ((Mono<?>) response).cache(Duration.ofMillis(timeToLive));
+			}
+			if (response instanceof Flux) {
+				return ((Flux<?>) response).cache(Duration.ofMillis(timeToLive));
+			}
+			return response;
 		}
 
 	}

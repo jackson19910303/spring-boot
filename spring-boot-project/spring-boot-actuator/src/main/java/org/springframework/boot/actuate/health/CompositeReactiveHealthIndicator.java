@@ -30,7 +30,9 @@ import reactor.util.function.Tuple2;
  *
  * @author Stephane Nicoll
  * @since 2.0.0
+ * @deprecated since 2.2.0 in favor of a {@link CompositeReactiveHealthContributor}
  */
+@Deprecated
 public class CompositeReactiveHealthIndicator implements ReactiveHealthIndicator {
 
 	private final ReactiveHealthIndicatorRegistry registry;
@@ -53,8 +55,8 @@ public class CompositeReactiveHealthIndicator implements ReactiveHealthIndicator
 			ReactiveHealthIndicatorRegistry registry) {
 		this.registry = registry;
 		this.healthAggregator = healthAggregator;
-		this.timeoutCompose = (mono) -> (this.timeout != null) ? mono.timeout(
-				Duration.ofMillis(this.timeout), Mono.just(this.timeoutHealth)) : mono;
+		this.timeoutCompose = (mono) -> (this.timeout != null)
+				? mono.timeout(Duration.ofMillis(this.timeout), Mono.just(this.timeoutHealth)) : mono;
 	}
 
 	/**
@@ -66,11 +68,9 @@ public class CompositeReactiveHealthIndicator implements ReactiveHealthIndicator
 	 * {@code timeout}
 	 * @return this instance
 	 */
-	public CompositeReactiveHealthIndicator timeoutStrategy(long timeout,
-			Health timeoutHealth) {
+	public CompositeReactiveHealthIndicator timeoutStrategy(long timeout, Health timeoutHealth) {
 		this.timeout = timeout;
-		this.timeoutHealth = (timeoutHealth != null) ? timeoutHealth
-				: Health.unknown().build();
+		this.timeoutHealth = (timeoutHealth != null) ? timeoutHealth : Health.unknown().build();
 		return this;
 	}
 
@@ -82,9 +82,8 @@ public class CompositeReactiveHealthIndicator implements ReactiveHealthIndicator
 	public Mono<Health> health() {
 		return Flux.fromIterable(this.registry.getAll().entrySet())
 				.flatMap((entry) -> Mono.zip(Mono.just(entry.getKey()),
-						entry.getValue().health().compose(this.timeoutCompose)))
-				.collectMap(Tuple2::getT1, Tuple2::getT2)
-				.map(this.healthAggregator::aggregate);
+						entry.getValue().health().transformDeferred(this.timeoutCompose)))
+				.collectMap(Tuple2::getT1, Tuple2::getT2).map(this.healthAggregator::aggregate);
 	}
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2018 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,11 +37,6 @@ public class LiquibaseProperties {
 	 * Change log configuration path.
 	 */
 	private String changeLog = "classpath:/db/changelog/db.changelog-master.yaml";
-
-	/**
-	 * Whether to check that the change log location exists.
-	 */
-	private boolean checkChangeLogLocation = true;
 
 	/**
 	 * Comma-separated list of runtime contexts to use.
@@ -126,14 +121,6 @@ public class LiquibaseProperties {
 	public void setChangeLog(String changeLog) {
 		Assert.notNull(changeLog, "ChangeLog must not be null");
 		this.changeLog = changeLog;
-	}
-
-	public boolean isCheckChangeLogLocation() {
-		return this.checkChangeLogLocation;
-	}
-
-	public void setCheckChangeLogLocation(boolean checkChangeLogLocation) {
-		this.checkChangeLogLocation = checkChangeLogLocation;
 	}
 
 	public String getContexts() {

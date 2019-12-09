@@ -16,12 +16,22 @@
 
 package org.springframework.boot.web.servlet;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.util.Map;
+import java.util.Properties;
 
 import javax.servlet.MultipartConfigElement;
+import javax.servlet.annotation.WebFilter;
+import javax.servlet.annotation.WebListener;
+import javax.servlet.annotation.WebServlet;
 
-import org.junit.After;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import org.springframework.boot.web.context.ServerPortInfoApplicationContextInitializer;
 import org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory;
@@ -34,47 +44,59 @@ import org.springframework.web.client.RestTemplate;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Integration tests for {@link ServletComponentScan}
+ * Integration tests for {@link ServletComponentScan @ServletComponentScan}
  *
  * @author Andy Wilkinson
  */
-public class ServletComponentScanIntegrationTests {
+class ServletComponentScanIntegrationTests {
 
 	private AnnotationConfigServletWebServerApplicationContext context;
 
-	@After
-	public void cleanUp() {
+	@AfterEach
+	void cleanUp() {
 		if (this.context != null) {
 			this.context.close();
 		}
 	}
 
 	@Test
-	public void componentsAreRegistered() {
+	void componentsAreRegistered() {
 		this.context = new AnnotationConfigServletWebServerApplicationContext();
 		this.context.register(TestConfiguration.class);
 		new ServerPortInfoApplicationContextInitializer().initialize(this.context);
 		this.context.refresh();
 		String port = this.context.getEnvironment().getProperty("local.server.port");
-		String response = new RestTemplate()
-				.getForObject("http://localhost:" + port + "/test", String.class);
+		String response = new RestTemplate().getForObject("http://localhost:" + port + "/test", String.class);
 		assertThat(response).isEqualTo("alpha bravo");
 	}
 
 	@Test
-	public void multipartConfigIsHonoured() {
+	void indexedComponentsAreRegistered(@TempDir File temp) throws IOException {
+		writeIndex(temp);
+		this.context = new AnnotationConfigServletWebServerApplicationContext();
+		try (URLClassLoader classLoader = new URLClassLoader(new URL[] { temp.toURI().toURL() },
+				getClass().getClassLoader())) {
+			this.context.setClassLoader(classLoader);
+			this.context.register(TestConfiguration.class);
+			new ServerPortInfoApplicationContextInitializer().initialize(this.context);
+			this.context.refresh();
+			String port = this.context.getEnvironment().getProperty("local.server.port");
+			String response = new RestTemplate().getForObject("http://localhost:" + port + "/test", String.class);
+			assertThat(response).isEqualTo("alpha bravo");
+		}
+	}
+
+	@Test
+	void multipartConfigIsHonoured() {
 		this.context = new AnnotationConfigServletWebServerApplicationContext();
 		this.context.register(TestConfiguration.class);
 		new ServerPortInfoApplicationContextInitializer().initialize(this.context);
 		this.context.refresh();
 		@SuppressWarnings("rawtypes")
-		Map<String, ServletRegistrationBean> beans = this.context
-				.getBeansOfType(ServletRegistrationBean.class);
-		ServletRegistrationBean<?> servletRegistrationBean = beans
-				.get(TestMultipartServlet.class.getName());
+		Map<String, ServletRegistrationBean> beans = this.context.getBeansOfType(ServletRegistrationBean.class);
+		ServletRegistrationBean<?> servletRegistrationBean = beans.get(TestMultipartServlet.class.getName());
 		assertThat(servletRegistrationBean).isNotNull();
-		MultipartConfigElement multipartConfig = servletRegistrationBean
-				.getMultipartConfig();
+		MultipartConfigElement multipartConfig = servletRegistrationBean.getMultipartConfig();
 		assertThat(multipartConfig).isNotNull();
 		assertThat(multipartConfig.getLocation()).isEqualTo("test");
 		assertThat(multipartConfig.getMaxRequestSize()).isEqualTo(2048);
@@ -82,13 +104,26 @@ public class ServletComponentScanIntegrationTests {
 		assertThat(multipartConfig.getFileSizeThreshold()).isEqualTo(512);
 	}
 
+	private void writeIndex(File temp) throws IOException {
+		File metaInf = new File(temp, "META-INF");
+		metaInf.mkdirs();
+		Properties index = new Properties();
+		index.setProperty("org.springframework.boot.web.servlet.testcomponents.TestFilter", WebFilter.class.getName());
+		index.setProperty("org.springframework.boot.web.servlet.testcomponents.TestListener",
+				WebListener.class.getName());
+		index.setProperty("org.springframework.boot.web.servlet.testcomponents.TestServlet",
+				WebServlet.class.getName());
+		try (FileWriter writer = new FileWriter(new File(metaInf, "spring.components"))) {
+			index.store(writer, null);
+		}
+	}
+
 	@Configuration(proxyBeanMethods = false)
-	@ServletComponentScan(
-			basePackages = "org.springframework.boot.web.servlet.testcomponents")
+	@ServletComponentScan(basePackages = "org.springframework.boot.web.servlet.testcomponents")
 	static class TestConfiguration {
 
 		@Bean
-		public TomcatServletWebServerFactory webServerFactory() {
+		TomcatServletWebServerFactory webServerFactory() {
 			return new TomcatServletWebServerFactory(0);
 		}
 

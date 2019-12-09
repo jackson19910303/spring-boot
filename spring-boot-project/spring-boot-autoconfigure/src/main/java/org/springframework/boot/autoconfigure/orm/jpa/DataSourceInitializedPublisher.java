@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2018 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,7 +46,6 @@ import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
  * only be registered via the inner {@link Registrar} class.
  *
  * @author Dave Syer
- * @since 1.1.0
  */
 class DataSourceInitializedPublisher implements BeanPostProcessor {
 
@@ -59,19 +58,22 @@ class DataSourceInitializedPublisher implements BeanPostProcessor {
 
 	private HibernateProperties hibernateProperties;
 
+	private DataSourceSchemaCreatedPublisher schemaCreatedPublisher;
+
 	@Override
-	public Object postProcessBeforeInitialization(Object bean, String beanName)
-			throws BeansException {
+	public Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
 		if (bean instanceof LocalContainerEntityManagerFactoryBean) {
 			LocalContainerEntityManagerFactoryBean factory = (LocalContainerEntityManagerFactoryBean) bean;
-			factory.setJpaVendorAdapter(new DataSourceSchemaCreatedPublisher(factory));
+			if (factory.getBootstrapExecutor() != null && factory.getJpaVendorAdapter() != null) {
+				this.schemaCreatedPublisher = new DataSourceSchemaCreatedPublisher(factory);
+				factory.setJpaVendorAdapter(this.schemaCreatedPublisher);
+			}
 		}
 		return bean;
 	}
 
 	@Override
-	public Object postProcessAfterInitialization(Object bean, String beanName)
-			throws BeansException {
+	public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
 		if (bean instanceof DataSource) {
 			// Normally this will be the right DataSource
 			this.dataSource = (DataSource) bean;
@@ -82,43 +84,40 @@ class DataSourceInitializedPublisher implements BeanPostProcessor {
 		if (bean instanceof HibernateProperties) {
 			this.hibernateProperties = (HibernateProperties) bean;
 		}
-		if (bean instanceof LocalContainerEntityManagerFactoryBean) {
-			LocalContainerEntityManagerFactoryBean factory = (LocalContainerEntityManagerFactoryBean) bean;
-			if (factory.getBootstrapExecutor() == null) {
-				publishEventIfRequired(factory.getNativeEntityManagerFactory());
-			}
+		if (bean instanceof LocalContainerEntityManagerFactoryBean && this.schemaCreatedPublisher == null) {
+			LocalContainerEntityManagerFactoryBean factoryBean = (LocalContainerEntityManagerFactoryBean) bean;
+			EntityManagerFactory entityManagerFactory = factoryBean.getNativeEntityManagerFactory();
+			publishEventIfRequired(factoryBean, entityManagerFactory);
 		}
 		return bean;
 	}
 
-	private void publishEventIfRequired(EntityManagerFactory entityManagerFactory) {
-		DataSource dataSource = findDataSource(entityManagerFactory);
+	private void publishEventIfRequired(LocalContainerEntityManagerFactoryBean factoryBean,
+			EntityManagerFactory entityManagerFactory) {
+		DataSource dataSource = findDataSource(factoryBean, entityManagerFactory);
 		if (dataSource != null && isInitializingDatabase(dataSource)) {
-			this.applicationContext
-					.publishEvent(new DataSourceSchemaCreatedEvent(dataSource));
+			this.applicationContext.publishEvent(new DataSourceSchemaCreatedEvent(dataSource));
 		}
 	}
 
-	private DataSource findDataSource(EntityManagerFactory entityManagerFactory) {
-		Object dataSource = entityManagerFactory.getProperties()
-				.get("javax.persistence.nonJtaDataSource");
-		return (dataSource instanceof DataSource) ? (DataSource) dataSource
-				: this.dataSource;
+	private DataSource findDataSource(LocalContainerEntityManagerFactoryBean factoryBean,
+			EntityManagerFactory entityManagerFactory) {
+		Object dataSource = entityManagerFactory.getProperties().get("javax.persistence.nonJtaDataSource");
+		if (dataSource == null) {
+			dataSource = factoryBean.getPersistenceUnitInfo().getNonJtaDataSource();
+		}
+		return (dataSource instanceof DataSource) ? (DataSource) dataSource : this.dataSource;
 	}
 
 	private boolean isInitializingDatabase(DataSource dataSource) {
 		if (this.jpaProperties == null || this.hibernateProperties == null) {
 			return true; // better safe than sorry
 		}
-		Supplier<String> defaultDdlAuto = () -> (EmbeddedDatabaseConnection
-				.isEmbedded(dataSource) ? "create-drop" : "none");
-		Map<String, Object> hibernate = this.hibernateProperties
-				.determineHibernateProperties(this.jpaProperties.getProperties(),
-						new HibernateSettings().ddlAuto(defaultDdlAuto));
-		if (hibernate.containsKey("hibernate.hbm2ddl.auto")) {
-			return true;
-		}
-		return false;
+		Supplier<String> defaultDdlAuto = () -> (EmbeddedDatabaseConnection.isEmbedded(dataSource) ? "create-drop"
+				: "none");
+		Map<String, Object> hibernate = this.hibernateProperties.determineHibernateProperties(
+				this.jpaProperties.getProperties(), new HibernateSettings().ddlAuto(defaultDdlAuto));
+		return hibernate.containsKey("hibernate.hbm2ddl.auto");
 	}
 
 	/**
@@ -148,14 +147,13 @@ class DataSourceInitializedPublisher implements BeanPostProcessor {
 
 	final class DataSourceSchemaCreatedPublisher implements JpaVendorAdapter {
 
+		private final LocalContainerEntityManagerFactoryBean factoryBean;
+
 		private final JpaVendorAdapter delegate;
 
-		private final LocalContainerEntityManagerFactoryBean factory;
-
-		private DataSourceSchemaCreatedPublisher(
-				LocalContainerEntityManagerFactoryBean factory) {
-			this.delegate = factory.getJpaVendorAdapter();
-			this.factory = factory;
+		private DataSourceSchemaCreatedPublisher(LocalContainerEntityManagerFactoryBean factoryBean) {
+			this.factoryBean = factoryBean;
+			this.delegate = factoryBean.getJpaVendorAdapter();
 		}
 
 		@Override
@@ -194,12 +192,12 @@ class DataSourceInitializedPublisher implements BeanPostProcessor {
 		}
 
 		@Override
-		public void postProcessEntityManagerFactory(EntityManagerFactory emf) {
-			this.delegate.postProcessEntityManagerFactory(emf);
-			AsyncTaskExecutor bootstrapExecutor = this.factory.getBootstrapExecutor();
+		public void postProcessEntityManagerFactory(EntityManagerFactory entityManagerFactory) {
+			this.delegate.postProcessEntityManagerFactory(entityManagerFactory);
+			AsyncTaskExecutor bootstrapExecutor = this.factoryBean.getBootstrapExecutor();
 			if (bootstrapExecutor != null) {
 				bootstrapExecutor.execute(() -> DataSourceInitializedPublisher.this
-						.publishEventIfRequired(emf));
+						.publishEventIfRequired(this.factoryBean, entityManagerFactory));
 			}
 		}
 

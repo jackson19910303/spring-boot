@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2018 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -83,8 +83,7 @@ public class InfoProperties implements Iterable<InfoProperties.Entry> {
 	 * @return a {@link PropertySource}
 	 */
 	public PropertySource<?> toPropertySource() {
-		return new PropertiesPropertySource(getClass().getSimpleName(),
-				copy(this.entries));
+		return new PropertiesPropertySource(getClass().getSimpleName(), copy(this.entries));
 	}
 
 	private Properties copy(Properties properties) {
@@ -122,7 +121,7 @@ public class InfoProperties implements Iterable<InfoProperties.Entry> {
 	/**
 	 * Property entry.
 	 */
-	public final class Entry {
+	public static final class Entry {
 
 		private final String key;
 

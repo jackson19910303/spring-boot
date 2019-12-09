@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2018 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ package org.springframework.boot.devtools.restart;
 
 import java.net.URL;
 
-import org.springframework.boot.devtools.DevToolsEnablementDeducer;
+import org.springframework.boot.devtools.system.DevToolsEnablementDeducer;
 
 /**
  * Default {@link RestartInitializer} that only enable initial restart when running a
@@ -49,8 +49,8 @@ public class DefaultRestartInitializer implements RestartInitializer {
 	 * @return {@code true} if the thread is a main invocation
 	 */
 	protected boolean isMain(Thread thread) {
-		return thread.getName().equals("main") && thread.getContextClassLoader()
-				.getClass().getName().contains("AppClassLoader");
+		return thread.getName().equals("main")
+				&& thread.getContextClassLoader().getClass().getName().contains("AppClassLoader");
 	}
 
 	/**
