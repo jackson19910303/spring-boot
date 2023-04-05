@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,11 +16,15 @@
 
 package org.springframework.boot.actuate.metrics;
 
+import java.util.Set;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import io.micrometer.core.annotation.Timed;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.Timer.Builder;
+
+import org.springframework.util.CollectionUtils;
 
 /**
  * Strategy that can be used to apply {@link Timer Timers} automatically instead of using
@@ -68,7 +72,7 @@ public interface AutoTimer {
 
 	/**
 	 * Factory method to create a new {@link Builder Timer.Builder} with auto-timer
-	 * settings {@link #apply(Builder) applied}.
+	 * settings {@link #apply(Timer.Builder) applied}.
 	 * @param name the name of the timer
 	 * @return a new builder instance with auto-settings applied
 	 */
@@ -78,7 +82,7 @@ public interface AutoTimer {
 
 	/**
 	 * Factory method to create a new {@link Builder Timer.Builder} with auto-timer
-	 * settings {@link #apply(Builder) applied}.
+	 * settings {@link #apply(Timer.Builder) applied}.
 	 * @param supplier the builder supplier
 	 * @return a new builder instance with auto-settings applied
 	 */
@@ -93,5 +97,18 @@ public interface AutoTimer {
 	 * @param builder the builder to apply settings to
 	 */
 	void apply(Timer.Builder builder);
+
+	static void apply(AutoTimer autoTimer, String metricName, Set<Timed> annotations, Consumer<Timer.Builder> action) {
+		if (!CollectionUtils.isEmpty(annotations)) {
+			for (Timed annotation : annotations) {
+				action.accept(Timer.builder(annotation, metricName));
+			}
+		}
+		else {
+			if (autoTimer != null && autoTimer.isEnabled()) {
+				action.accept(autoTimer.builder(metricName));
+			}
+		}
+	}
 
 }

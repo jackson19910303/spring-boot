@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,10 +18,24 @@ package org.springframework.boot.gradle.tasks.buildinfo;
 
 import java.io.Serializable;
 import java.time.Instant;
+import java.time.format.DateTimeFormatter;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.function.Supplier;
+
+import javax.inject.Inject;
 
 import org.gradle.api.Project;
+import org.gradle.api.provider.MapProperty;
+import org.gradle.api.provider.Property;
+import org.gradle.api.provider.SetProperty;
+import org.gradle.api.tasks.Input;
+import org.gradle.api.tasks.Internal;
+import org.gradle.api.tasks.Optional;
+
+import org.springframework.util.function.SingletonSupplier;
 
 /**
  * The properties that are written into the {@code build-info.properties} file.
@@ -30,178 +44,135 @@ import org.gradle.api.Project;
  * @since 2.0.0
  */
 @SuppressWarnings("serial")
-public class BuildInfoProperties implements Serializable {
+public abstract class BuildInfoProperties implements Serializable {
 
-	private final transient Project project;
+	private final SetProperty<String> excludes;
 
-	private String group;
+	private final Supplier<String> creationTime = SingletonSupplier.of(new CurrentIsoInstantSupplier());
 
-	private String artifact;
-
-	private String version;
-
-	private String name;
-
-	private Instant time;
-
-	private Map<String, Object> additionalProperties = new HashMap<>();
-
-	BuildInfoProperties(Project project) {
-		this.project = project;
-		this.time = Instant.now();
+	@Inject
+	public BuildInfoProperties(Project project, SetProperty<String> excludes) {
+		this.excludes = excludes;
+		getGroup().convention(project.provider(() -> project.getGroup().toString()));
+		getVersion().convention(project.provider(() -> project.getVersion().toString()));
+		getArtifact()
+			.convention(project.provider(() -> project.findProperty("archivesBaseName")).map(Object::toString));
+		getName().convention(project.provider(project::getName));
 	}
 
 	/**
-	 * Returns the value used for the {@code build.group} property. Defaults to the
-	 * {@link Project#getGroup() Project's group}.
-	 * @return the group
+	 * Returns the {@code build.group} property. Defaults to the {@link Project#getGroup()
+	 * Project's group}.
+	 * @return the group property
 	 */
-	public String getGroup() {
-		if (this.group == null) {
-			this.group = this.project.getGroup().toString();
-		}
-		return this.group;
-	}
+	@Internal
+	public abstract Property<String> getGroup();
 
 	/**
-	 * Sets the value used for the {@code build.group} property.
-	 * @param group the group name
+	 * Returns the {@code build.artifact} property.
+	 * @return the artifact property
 	 */
-	public void setGroup(String group) {
-		this.group = group;
-	}
+	@Internal
+	public abstract Property<String> getArtifact();
 
 	/**
-	 * Returns the value used for the {@code build.artifact} property.
-	 * @return the artifact
-	 */
-	public String getArtifact() {
-		return this.artifact;
-	}
-
-	/**
-	 * Sets the value used for the {@code build.artifact} property.
-	 * @param artifact the artifact
-	 */
-	public void setArtifact(String artifact) {
-		this.artifact = artifact;
-	}
-
-	/**
-	 * Returns the value used for the {@code build.version} property. Defaults to the
+	 * Returns the {@code build.version} property. Defaults to the
 	 * {@link Project#getVersion() Project's version}.
 	 * @return the version
 	 */
-	public String getVersion() {
-		if (this.version == null) {
-			this.version = this.project.getVersion().toString();
-		}
-		return this.version;
-	}
+	@Internal
+	public abstract Property<String> getVersion();
 
 	/**
-	 * Sets the value used for the {@code build.version} property.
-	 * @param version the version
-	 */
-	public void setVersion(String version) {
-		this.version = version;
-	}
-
-	/**
-	 * Returns the value used for the {@code build.name} property. Defaults to the
-	 * {@link Project#getDisplayName() Project's display name}.
+	 * Returns the {@code build.name} property. Defaults to the {@link Project#getName()
+	 * Project's name}.
 	 * @return the name
 	 */
-	public String getName() {
-		if (this.name == null) {
-			this.name = this.project.getName();
-		}
-		return this.name;
-	}
+	@Internal
+	public abstract Property<String> getName();
 
 	/**
-	 * Sets the value used for the {@code build.name} property.
-	 * @param name the name
-	 */
-	public void setName(String name) {
-		this.name = name;
-	}
-
-	/**
-	 * Returns the value used for the {@code build.time} property. Defaults to
-	 * {@link Instant#now} when the {@code BuildInfoProperties} instance was created.
+	 * Returns the {@code build.time} property.
 	 * @return the time
 	 */
-	public Instant getTime() {
-		return this.time;
-	}
-
-	/**
-	 * Sets the value used for the {@code build.time} property.
-	 * @param time the build time
-	 */
-	public void setTime(Instant time) {
-		this.time = time;
-	}
+	@Internal
+	public abstract Property<String> getTime();
 
 	/**
 	 * Returns the additional properties that will be included. When written, the name of
 	 * each additional property is prefixed with {@code build.}.
 	 * @return the additional properties
 	 */
-	public Map<String, Object> getAdditional() {
-		return this.additionalProperties;
+	@Internal
+	public abstract MapProperty<String, Object> getAdditional();
+
+	@Input
+	@Optional
+	String getArtifactIfNotExcluded() {
+		return getIfNotExcluded(getArtifact(), "artifact");
 	}
 
-	/**
-	 * Sets the additional properties that will be included. When written, the name of
-	 * each additional property is prefixed with {@code build.}.
-	 * @param additionalProperties the additional properties
-	 */
-	public void setAdditional(Map<String, Object> additionalProperties) {
-		this.additionalProperties = additionalProperties;
+	@Input
+	@Optional
+	String getGroupIfNotExcluded() {
+		return getIfNotExcluded(getGroup(), "group");
 	}
 
-	@Override
-	public boolean equals(Object obj) {
-		if (this == obj) {
-			return true;
-		}
-		if (obj == null || getClass() != obj.getClass()) {
-			return false;
-		}
-		BuildInfoProperties other = (BuildInfoProperties) obj;
-		boolean result = true;
-		result = result && nullSafeEquals(this.additionalProperties, other.additionalProperties);
-		result = result && nullSafeEquals(this.artifact, other.artifact);
-		result = result && nullSafeEquals(this.group, other.group);
-		result = result && nullSafeEquals(this.name, other.name);
-		result = result && nullSafeEquals(this.version, other.version);
-		result = result && nullSafeEquals(this.time, other.time);
-		return result;
+	@Input
+	@Optional
+	String getNameIfNotExcluded() {
+		return getIfNotExcluded(getName(), "name");
 	}
 
-	private boolean nullSafeEquals(Object o1, Object o2) {
-		if (o1 == o2) {
-			return true;
-		}
-		if (o1 == null || o2 == null) {
-			return false;
-		}
-		return (o1.equals(o2));
+	@Input
+	@Optional
+	Instant getTimeIfNotExcluded() {
+		String time = getIfNotExcluded(getTime(), "time", this.creationTime);
+		return (time != null) ? Instant.parse(time) : null;
 	}
 
-	@Override
-	public int hashCode() {
-		final int prime = 31;
-		int result = 1;
-		result = prime * result + ((this.additionalProperties == null) ? 0 : this.additionalProperties.hashCode());
-		result = prime * result + ((this.artifact == null) ? 0 : this.artifact.hashCode());
-		result = prime * result + ((this.group == null) ? 0 : this.group.hashCode());
-		result = prime * result + ((this.name == null) ? 0 : this.name.hashCode());
-		result = prime * result + ((this.version == null) ? 0 : this.version.hashCode());
-		result = prime * result + ((this.time == null) ? 0 : this.time.hashCode());
-		return result;
+	@Input
+	@Optional
+	String getVersionIfNotExcluded() {
+		return getIfNotExcluded(getVersion(), "version");
+	}
+
+	@Input
+	Map<String, String> getAdditionalIfNotExcluded() {
+		return coerceToStringValues(applyExclusions(getAdditional().getOrElse(Collections.emptyMap())));
+	}
+
+	private <T> T getIfNotExcluded(Property<T> property, String name) {
+		return getIfNotExcluded(property, name, () -> null);
+	}
+
+	private <T> T getIfNotExcluded(Property<T> property, String name, Supplier<T> defaultValue) {
+		if (this.excludes.getOrElse(Collections.emptySet()).contains(name)) {
+			return null;
+		}
+		return property.getOrElse(defaultValue.get());
+	}
+
+	private Map<String, String> coerceToStringValues(Map<String, Object> input) {
+		Map<String, String> output = new HashMap<>();
+		input.forEach((key, value) -> output.put(key, (value != null) ? value.toString() : null));
+		return output;
+	}
+
+	private Map<String, Object> applyExclusions(Map<String, Object> input) {
+		Map<String, Object> output = new HashMap<>();
+		Set<String> exclusions = this.excludes.getOrElse(Collections.emptySet());
+		input.forEach((key, value) -> output.put(key, (!exclusions.contains(key)) ? value : null));
+		return output;
+	}
+
+	private static final class CurrentIsoInstantSupplier implements Supplier<String> {
+
+		@Override
+		public String get() {
+			return DateTimeFormatter.ISO_INSTANT.format(Instant.now());
+		}
+
 	}
 
 }

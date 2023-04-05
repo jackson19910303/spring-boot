@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +16,9 @@
 
 package org.springframework.boot.autoconfigure.jms;
 
-import javax.jms.ConnectionFactory;
 import javax.naming.Context;
 
+import jakarta.jms.ConnectionFactory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,7 +43,7 @@ import static org.mockito.Mockito.mock;
 class JndiConnectionFactoryAutoConfigurationTests {
 
 	private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
-			.withConfiguration(AutoConfigurations.of(JndiConnectionFactoryAutoConfiguration.class));
+		.withConfiguration(AutoConfigurations.of(JndiConnectionFactoryAutoConfiguration.class));
 
 	private ClassLoader threadContextClassLoader;
 
@@ -90,29 +90,31 @@ class JndiConnectionFactoryAutoConfigurationTests {
 	void jndiNamePropertySet() {
 		ConnectionFactory connectionFactory = configureConnectionFactory("java:comp/env/myCF");
 		this.contextRunner.withPropertyValues("spring.jms.jndi-name=java:comp/env/myCF")
-				.run(assertConnectionFactory(connectionFactory));
+			.run(assertConnectionFactory(connectionFactory));
 	}
 
 	@Test
 	void jndiNamePropertySetWithResourceRef() {
 		ConnectionFactory connectionFactory = configureConnectionFactory("java:comp/env/myCF");
 		this.contextRunner.withPropertyValues("spring.jms.jndi-name=myCF")
-				.run(assertConnectionFactory(connectionFactory));
+			.run(assertConnectionFactory(connectionFactory));
 	}
 
 	@Test
 	void jndiNamePropertySetWithWrongValue() {
 		this.contextRunner.withPropertyValues("spring.jms.jndi-name=doesNotExistCF").run((context) -> {
 			assertThat(context).hasFailed();
-			assertThat(context).getFailure().isInstanceOf(BeanCreationException.class)
-					.hasMessageContaining("doesNotExistCF");
+			assertThat(context).getFailure()
+				.isInstanceOf(BeanCreationException.class)
+				.hasMessageContaining("doesNotExistCF");
 		});
 	}
 
 	private ContextConsumer<AssertableApplicationContext> assertConnectionFactory(ConnectionFactory connectionFactory) {
 		return (context) -> {
-			assertThat(context).hasSingleBean(ConnectionFactory.class);
-			assertThat(context.getBean(ConnectionFactory.class)).isSameAs(connectionFactory);
+			assertThat(context).hasSingleBean(ConnectionFactory.class).hasBean("jmsConnectionFactory");
+			assertThat(context.getBean(ConnectionFactory.class)).isSameAs(connectionFactory)
+				.isSameAs(context.getBean("jmsConnectionFactory"));
 		};
 	}
 
